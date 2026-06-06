@@ -1,5 +1,7 @@
+export { DEFAULT_TAG_PROMPT } from "@/lib/taggers/prompts";
+
 export interface Tagger {
-  tag(absPath: string, ext: string): Promise<string[]>;
+  tag(absPath: string, ext: string, prompt?: string): Promise<string[]>;
 }
 
 export function getTagger(): Tagger {

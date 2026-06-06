@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { readFileSync } from "node:fs";
+import { DEFAULT_TAG_PROMPT } from "@/lib/taggers/prompts";
 
 const MODEL = process.env.TAGGER_MODEL ?? "claude-haiku-4-5";
 
@@ -11,13 +12,11 @@ const RASTER_MIME: Record<string, "image/png" | "image/jpeg" | "image/gif" | "im
   webp: "image/webp",
 };
 
-const PROMPT =
-  "This is an icon or image file. List 3–8 short, descriptive tags that describe what this icon depicts or what it is used for. Return ONLY a JSON array of lowercase strings, nothing else. Example: [\"arrow\",\"navigation\",\"direction\",\"ui\"]";
-
 export class ClaudeTagger {
   private client = new Anthropic();
 
-  async tag(absPath: string, ext: string): Promise<string[]> {
+  async tag(absPath: string, ext: string, prompt?: string): Promise<string[]> {
+    const effectivePrompt = prompt?.trim() || DEFAULT_TAG_PROMPT;
     let imageBase64: string;
     let mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
 
@@ -47,7 +46,7 @@ export class ClaudeTagger {
               type: "image",
               source: { type: "base64", media_type: mediaType, data: imageBase64 },
             },
-            { type: "text", text: PROMPT },
+            { type: "text", text: effectivePrompt },
           ],
         },
       ],

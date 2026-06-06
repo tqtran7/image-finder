@@ -31,6 +31,13 @@ function createDb(): DB {
 
 function migrate(db: DB): void {
   db.exec(`
+    CREATE TABLE IF NOT EXISTS collections (
+      id         INTEGER PRIMARY KEY,
+      name       TEXT NOT NULL,
+      prompt     TEXT,                       -- NULL / '' => use DEFAULT_TAG_PROMPT
+      created_at INTEGER
+    );
+
     CREATE TABLE IF NOT EXISTS roots (
       id              INTEGER PRIMARY KEY,
       path            TEXT UNIQUE NOT NULL,
@@ -86,6 +93,39 @@ function migrate(db: DB): void {
     CREATE INDEX IF NOT EXISTS idx_tags_name        ON tags(name);
     CREATE INDEX IF NOT EXISTS idx_suggestions_img  ON tag_suggestions(image_id);
   `);
+
+  // ── roots.collection_id (added incrementally on existing DBs) ──────────────
+  const rootCols = db.prepare("PRAGMA table_info(roots)").all() as {
+    name: string;
+  }[];
+  const hasCollectionId = rootCols.some((c) => c.name === "collection_id");
+  if (!hasCollectionId) {
+    // SQLite can't add an FK column with a non-constant default, so it's nullable.
+    db.exec(
+      "ALTER TABLE roots ADD COLUMN collection_id INTEGER REFERENCES collections(id)",
+    );
+  }
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_roots_collection ON roots(collection_id)",
+  );
+
+  // ── Ensure a fallback "Default" collection exists, then backfill roots ─────
+  const count = (
+    db.prepare("SELECT COUNT(*) AS n FROM collections").get() as { n: number }
+  ).n;
+  if (count === 0) {
+    db.prepare(
+      "INSERT INTO collections (name, prompt, created_at) VALUES ('Default', NULL, ?)",
+    ).run(Date.now());
+  }
+  const defaultId = (
+    db
+      .prepare("SELECT id FROM collections ORDER BY id ASC LIMIT 1")
+      .get() as { id: number }
+  ).id;
+  db.prepare(
+    "UPDATE roots SET collection_id = ? WHERE collection_id IS NULL",
+  ).run(defaultId);
 }
 
 export function getDb(): DB {

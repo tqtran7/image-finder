@@ -4,6 +4,7 @@ import type { ImageItem } from "@/components/IconCard";
 export interface SearchFilters {
   tags?: string[];
   rootId?: number;
+  collectionId?: number;
 }
 
 interface RawImage {
@@ -15,12 +16,17 @@ interface RawImage {
 
 export function searchImages(filters: SearchFilters): ImageItem[] {
   const db = getDb();
-  const { tags, rootId } = filters;
+  const { tags, rootId, collectionId } = filters;
 
   const conditions: string[] = ["i.missing_at IS NULL"];
   const params: (string | number)[] = [];
 
-  if (rootId) {
+  if (collectionId) {
+    conditions.push(
+      "i.root_id IN (SELECT id FROM roots WHERE collection_id = ?)",
+    );
+    params.push(collectionId);
+  } else if (rootId) {
     conditions.push("i.root_id = ?");
     params.push(rootId);
   }
@@ -80,5 +86,6 @@ export function parseFilters(
   return {
     tags: tags?.length ? tags : undefined,
     rootId: raw("root") ? Number(raw("root")) : undefined,
+    collectionId: raw("collection") ? Number(raw("collection")) : undefined,
   };
 }

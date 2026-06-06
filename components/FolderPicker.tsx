@@ -10,10 +10,11 @@ interface FsEntry {
 }
 
 interface FolderPickerProps {
+  collectionId: number;
   onClose: () => void;
 }
 
-export default function FolderPicker({ onClose }: FolderPickerProps) {
+export default function FolderPicker({ collectionId, onClose }: FolderPickerProps) {
   const [currentPath, setCurrentPath] = useState<string | null>(null);
   const [entries, setEntries] = useState<FsEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +49,7 @@ export default function FolderPicker({ onClose }: FolderPickerProps) {
     if (!currentPath) return;
     startTransition(async () => {
       try {
-        await addRoot(currentPath);
+        await addRoot(currentPath, collectionId);
         onClose();
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));

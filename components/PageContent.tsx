@@ -5,12 +5,15 @@ import RootsManager from "@/components/RootsManager";
 import IconGrid from "@/components/IconGrid";
 import SelectionToolbar from "@/components/SelectionToolbar";
 import SuggestionsPanel from "@/components/SuggestionsPanel";
+import CollectionSwitcher from "@/components/CollectionSwitcher";
+import CollectionEditor from "@/components/CollectionEditor";
 import SearchBar from "@/components/SearchBar";
 import ThemeToggle from "@/components/ThemeToggle";
 import { removeTag } from "@/lib/actions";
 import type { RootWithCount } from "@/app/page";
 import type { ImageItem } from "@/components/IconCard";
 import type { SuggestionGroup } from "@/components/SuggestionsPanel";
+import type { CollectionItem } from "@/components/CollectionSwitcher";
 
 interface PageContentProps {
   roots: RootWithCount[];
@@ -18,6 +21,8 @@ interface PageContentProps {
   vocabulary: string[];
   totalCount: number;
   suggestions: SuggestionGroup[];
+  collections: CollectionItem[];
+  activeCollectionId: number;
 }
 
 export default function PageContent({
@@ -26,7 +31,10 @@ export default function PageContent({
   vocabulary,
   totalCount,
   suggestions,
+  collections,
+  activeCollectionId,
 }: PageContentProps) {
+  const [editingCollection, setEditingCollection] = useState<CollectionItem | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [lastSelectedIdx, setLastSelectedIdx] = useState<number | null>(null);
   const [, startTransition] = useTransition();
@@ -78,12 +86,21 @@ export default function PageContent({
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
         <aside className="w-72 shrink-0 border-r border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex flex-col overflow-y-auto">
+          {/* Collection switcher */}
+          <Suspense>
+            <CollectionSwitcher
+              collections={collections}
+              activeCollectionId={activeCollectionId}
+              onEditCollection={setEditingCollection}
+            />
+          </Suspense>
+
           {/* Folders section */}
           <div className="px-4 py-4">
             <h2 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
               Folders
             </h2>
-            <RootsManager roots={roots} />
+            <RootsManager roots={roots} activeCollectionId={activeCollectionId} />
           </div>
 
           {/* Tag panel — shown when items are selected */}
@@ -99,6 +116,14 @@ export default function PageContent({
           {/* AI suggestion review panel */}
           <SuggestionsPanel groups={suggestions} />
         </aside>
+
+        {editingCollection && (
+          <CollectionEditor
+            collection={editingCollection}
+            isDefault={editingCollection.id === collections[0]?.id}
+            onClose={() => setEditingCollection(null)}
+          />
+        )}
 
         {/* Main — search bar + icon grid */}
         <main className="flex-1 flex flex-col overflow-hidden bg-zinc-50 dark:bg-zinc-900">

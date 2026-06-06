@@ -5,7 +5,13 @@ import FolderPicker from "@/components/FolderPicker";
 import { removeRoot, rescanRoot } from "@/lib/actions";
 import type { RootWithCount } from "@/app/page";
 
-export default function RootsManager({ roots }: { roots: RootWithCount[] }) {
+export default function RootsManager({
+  roots,
+  activeCollectionId,
+}: {
+  roots: RootWithCount[];
+  activeCollectionId: number;
+}) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [scanningId, setScanningId] = useState<number | null>(null);
@@ -92,7 +98,12 @@ export default function RootsManager({ roots }: { roots: RootWithCount[] }) {
         + Add folder
       </button>
 
-      {pickerOpen && <FolderPicker onClose={() => setPickerOpen(false)} />}
+      {pickerOpen && (
+        <FolderPicker
+          collectionId={activeCollectionId}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
     </div>
   );
 }

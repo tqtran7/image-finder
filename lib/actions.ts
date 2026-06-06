@@ -7,9 +7,53 @@ import { getDb } from "@/lib/db";
 import { scanRoot } from "@/lib/scan";
 import { getTagger } from "@/lib/taggers";
 
+// ── Collections ────────────────────────────────────────────────────────────
+
+export async function createCollection(name: string): Promise<number> {
+  const db = getDb();
+  const result = db
+    .prepare(
+      "INSERT INTO collections (name, prompt, created_at) VALUES (?, NULL, ?) RETURNING id",
+    )
+    .get(name.trim(), Date.now()) as { id: number };
+  revalidatePath("/");
+  return result.id;
+}
+
+export async function renameCollection(id: number, name: string) {
+  getDb().prepare("UPDATE collections SET name = ? WHERE id = ?").run(name.trim(), id);
+  revalidatePath("/");
+}
+
+export async function updateCollectionPrompt(id: number, prompt: string) {
+  const trimmed = prompt.trim() || null;
+  getDb().prepare("UPDATE collections SET prompt = ? WHERE id = ?").run(trimmed, id);
+  revalidatePath("/");
+}
+
+export async function deleteCollection(id: number) {
+  const db = getDb();
+  const count = (
+    db.prepare("SELECT COUNT(*) AS n FROM collections").get() as { n: number }
+  ).n;
+  if (count <= 1) throw new Error("Cannot delete the last remaining collection.");
+
+  const defaultId = (
+    db
+      .prepare("SELECT id FROM collections WHERE id != ? ORDER BY id ASC LIMIT 1")
+      .get(id) as { id: number }
+  ).id;
+
+  db.transaction(() => {
+    db.prepare("UPDATE roots SET collection_id = ? WHERE collection_id = ?").run(defaultId, id);
+    db.prepare("DELETE FROM collections WHERE id = ?").run(id);
+  })();
+  revalidatePath("/");
+}
+
 // ── Roots ──────────────────────────────────────────────────────────────────
 
-export async function addRoot(absPath: string, label?: string) {
+export async function addRoot(absPath: string, collectionId: number, label?: string) {
   const resolved = path.resolve(absPath);
 
   try {
@@ -27,12 +71,12 @@ export async function addRoot(absPath: string, label?: string) {
 
   const result = db
     .prepare(
-      `INSERT INTO roots (path, label, added_at)
-       VALUES (?, ?, ?)
-       ON CONFLICT(path) DO UPDATE SET label = excluded.label
+      `INSERT INTO roots (path, label, added_at, collection_id)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(path) DO UPDATE SET label = excluded.label, collection_id = excluded.collection_id
        RETURNING id`,
     )
-    .get(resolved, label ?? path.basename(resolved), now) as
+    .get(resolved, label ?? path.basename(resolved), now, collectionId) as
     | { id: number }
     | undefined;
 
@@ -105,8 +149,14 @@ export async function autoTagImages(imageIds: number[]) {
   const now = Date.now();
 
   const images = db
-    .prepare("SELECT id, abs_path, ext FROM images WHERE id IN (" + imageIds.map(() => "?").join(",") + ")")
-    .all(...imageIds) as { id: number; abs_path: string; ext: string }[];
+    .prepare(
+      `SELECT i.id, i.abs_path, i.ext, c.prompt AS collection_prompt
+       FROM images i
+       JOIN roots r ON r.id = i.root_id
+       JOIN collections c ON c.id = r.collection_id
+       WHERE i.id IN (${imageIds.map(() => "?").join(",")})`,
+    )
+    .all(...imageIds) as { id: number; abs_path: string; ext: string; collection_prompt: string | null }[];
 
   const insert = db.prepare(
     `INSERT OR IGNORE INTO tag_suggestions (image_id, name, model, created_at, status)
@@ -119,7 +169,7 @@ export async function autoTagImages(imageIds: number[]) {
   for (const img of images) {
     let tags: string[];
     try {
-      tags = await tagger.tag(img.abs_path, img.ext);
+      tags = await tagger.tag(img.abs_path, img.ext, img.collection_prompt ?? undefined);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[autoTag] ${img.abs_path} failed:`, msg);
