@@ -1,65 +1,64 @@
-import Image from "next/image";
+import { getDb } from "@/lib/db";
+import RootsManager from "@/components/RootsManager";
+import IconGrid from "@/components/IconGrid";
+import type { ImageItem } from "@/components/IconCard";
+
+export interface RootWithCount {
+  id: number;
+  path: string;
+  label: string;
+  added_at: number | null;
+  last_scanned_at: number | null;
+  image_count: number;
+}
 
 export default function Home() {
+  const db = getDb();
+
+  const roots = db
+    .prepare(
+      `SELECT r.id, r.path, r.label, r.added_at, r.last_scanned_at,
+              COUNT(CASE WHEN i.missing_at IS NULL THEN 1 END) AS image_count
+       FROM roots r
+       LEFT JOIN images i ON i.root_id = r.id
+       GROUP BY r.id
+       ORDER BY r.added_at DESC`,
+    )
+    .all() as RootWithCount[];
+
+  const images = db
+    .prepare(
+      `SELECT id, filename, ext
+       FROM images
+       WHERE missing_at IS NULL
+       ORDER BY filename COLLATE NOCASE`,
+    )
+    .all() as ImageItem[];
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className="h-screen flex flex-col font-sans bg-zinc-50">
+      {/* Header */}
+      <header className="shrink-0 bg-white border-b px-6 py-3 flex items-center">
+        <h1 className="text-base font-semibold text-zinc-900">Icon Finder</h1>
+      </header>
+
+      {/* Body: sidebar + grid */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Sidebar — folders */}
+        <aside className="w-72 shrink-0 border-r bg-white flex flex-col overflow-y-auto">
+          <div className="px-4 py-4 border-b">
+            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">
+              Folders
+            </h2>
+            <RootsManager roots={roots} />
+          </div>
+        </aside>
+
+        {/* Main — icon grid */}
+        <main className="flex-1 flex flex-col overflow-hidden bg-zinc-50">
+          <IconGrid images={images} />
+        </main>
+      </div>
     </div>
   );
 }
