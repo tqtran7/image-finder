@@ -192,32 +192,52 @@ export async function autoTagImages(imageIds: number[]) {
   return { tagged, total: images.length, errors };
 }
 
-export async function autoTagRoot(rootId: number) {
+/** Returns the IDs of all non-missing images in a root, ordered by filename. */
+export async function getImagesForRoot(rootId: number): Promise<{ id: number }[]> {
+  return getDb()
+    .prepare(
+      "SELECT id FROM images WHERE root_id = ? AND missing_at IS NULL ORDER BY filename COLLATE NOCASE",
+    )
+    .all(rootId) as { id: number }[];
+}
+
+/**
+ * Tags a single image and writes the result directly into image_tags (source 'ai').
+ * Does NOT call revalidatePath — caller should router.refresh() after the full batch.
+ */
+export async function autoTagAndAcceptImage(
+  imageId: number,
+): Promise<{ tagged: boolean; error?: string }> {
   const db = getDb();
   const tagger = getTagger();
   const now = Date.now();
 
-  const root = db
-    .prepare("SELECT label FROM roots WHERE id = ?")
-    .get(rootId) as { label: string } | undefined;
-  if (!root) throw new Error(`Root ${rootId} not found`);
-
-  const images = db
+  const img = db
     .prepare(
       `SELECT i.id, i.abs_path, i.ext, c.prompt AS collection_prompt
        FROM images i
        JOIN roots r ON r.id = i.root_id
        JOIN collections c ON c.id = r.collection_id
-       WHERE i.root_id = ? AND i.missing_at IS NULL`,
+       WHERE i.id = ? AND i.missing_at IS NULL`,
     )
-    .all(rootId) as {
+    .get(imageId) as {
     id: number;
     abs_path: string;
     ext: string;
     collection_prompt: string | null;
-  }[];
+  } | undefined;
 
-  console.log(`[autoTagRoot] "${root.label}" (${rootId}): ${images.length} images`);
+  if (!img) return { tagged: false, error: "Image not found or missing" };
+
+  let tags: string[];
+  try {
+    tags = await tagger.tag(img.abs_path, img.ext, img.collection_prompt ?? undefined);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { tagged: false, error: msg };
+  }
+
+  if (tags.length === 0) return { tagged: false };
 
   const upsertTag = db.prepare(
     `INSERT INTO tags (name) VALUES (lower(?))
@@ -230,37 +250,15 @@ export async function autoTagRoot(rootId: number) {
      ON CONFLICT(image_id, tag_id) DO NOTHING`,
   );
 
-  let tagged = 0;
-  const errors: string[] = [];
-
-  for (const img of images) {
-    let tags: string[];
-    try {
-      tags = await tagger.tag(img.abs_path, img.ext, img.collection_prompt ?? undefined);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[autoTagRoot] ${img.abs_path} failed:`, msg);
-      errors.push(`${img.id}: ${msg}`);
-      continue;
+  db.transaction(() => {
+    for (const name of tags) {
+      if (!name) continue;
+      const tag = upsertTag.get(name) as { id: number } | undefined;
+      if (tag) insertImageTag.run(img.id, tag.id, now);
     }
-    if (tags.length === 0) continue;
+  })();
 
-    // Auto-accept: write straight into image_tags (source 'ai'), no review step
-    db.transaction(() => {
-      for (const name of tags) {
-        if (!name) continue;
-        const tag = upsertTag.get(name) as { id: number } | undefined;
-        if (tag) insertImageTag.run(img.id, tag.id, now);
-      }
-    })();
-    tagged++;
-  }
-
-  console.log(
-    `[autoTagRoot] done: ${tagged}/${images.length} images tagged, ${errors.length} errors`,
-  );
-  revalidatePath("/");
-  return { tagged, total: images.length, errors };
+  return { tagged: true };
 }
 
 export async function acceptSuggestions(imageId: number) {

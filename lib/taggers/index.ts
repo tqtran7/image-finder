@@ -13,6 +13,12 @@ export function getTagger(): Tagger {
     return new OllamaTagger();
   }
 
+  if (provider === "lmstudio") {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { LMStudioTagger } = require("./lmstudio") as typeof import("./lmstudio");
+    return new LMStudioTagger();
+  }
+
   // Default: Anthropic Claude
   // Dynamic require so Next doesn't try to bundle @anthropic-ai/sdk at build time
   // eslint-disable-next-line @typescript-eslint/no-require-imports
