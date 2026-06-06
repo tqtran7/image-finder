@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useTransition, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import RootsManager from "@/components/RootsManager";
 import IconGrid from "@/components/IconGrid";
 import SelectionToolbar from "@/components/SelectionToolbar";
@@ -34,32 +35,21 @@ export default function PageContent({
   collections,
   activeCollectionId,
 }: PageContentProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [editingCollection, setEditingCollection] = useState<CollectionItem | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [lastSelectedIdx, setLastSelectedIdx] = useState<number | null>(null);
   const [, startTransition] = useTransition();
 
-  const handleCardClick = useCallback(
-    (id: number, shiftKey: boolean) => {
-      const idx = images.findIndex((img) => img.id === id);
-
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        if (shiftKey && lastSelectedIdx !== null) {
-          const lo = Math.min(lastSelectedIdx, idx);
-          const hi = Math.max(lastSelectedIdx, idx);
-          for (let i = lo; i <= hi; i++) next.add(images[i].id);
-        } else {
-          if (next.has(id)) next.delete(id);
-          else next.add(id);
-        }
-        return next;
-      });
-
-      if (!shiftKey) setLastSelectedIdx(idx);
-    },
-    [images, lastSelectedIdx],
-  );
+  const handleCardClick = useCallback((id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else { next.clear(); next.add(id); }
+      return next;
+    });
+  }, []);
 
   const handleRemoveTag = useCallback((imageId: number, tagName: string) => {
     startTransition(async () => {
@@ -69,8 +59,16 @@ export default function PageContent({
 
   const handleClearSelection = useCallback(() => {
     setSelectedIds(new Set());
-    setLastSelectedIdx(null);
   }, []);
+
+  const handleTagClick = useCallback((tagName: string) => {
+    const p = new URLSearchParams(searchParams.toString());
+    const existing = p.get("tags")?.split(",").filter(Boolean) ?? [];
+    if (!existing.includes(tagName)) {
+      p.set("tags", [...existing, tagName].join(","));
+      router.replace("?" + p.toString(), { scroll: false });
+    }
+  }, [router, searchParams]);
 
   return (
     <div className="h-screen flex flex-col font-sans bg-zinc-50 dark:bg-zinc-900">
@@ -110,6 +108,7 @@ export default function PageContent({
               images={images}
               vocabulary={vocabulary}
               onClearSelection={handleClearSelection}
+              onTagClick={handleTagClick}
             />
           )}
 
@@ -139,6 +138,7 @@ export default function PageContent({
             selectedIds={selectedIds}
             onCardClick={handleCardClick}
             onRemoveTag={handleRemoveTag}
+            onTagClick={handleTagClick}
           />
         </main>
       </div>

@@ -9,8 +9,9 @@ const GAP = 8;
 interface IconGridProps {
   images: ImageItem[];
   selectedIds: Set<number>;
-  onCardClick: (id: number, shiftKey: boolean) => void;
+  onCardClick: (id: number) => void;
   onRemoveTag: (imageId: number, tagName: string) => void;
+  onTagClick: (tagName: string) => void;
 }
 
 export default function IconGrid({
@@ -18,6 +19,7 @@ export default function IconGrid({
   selectedIds,
   onCardClick,
   onRemoveTag,
+  onTagClick,
 }: IconGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
@@ -90,6 +92,7 @@ export default function IconGrid({
                       selected={selectedIds.has(img.id)}
                       onCardClick={onCardClick}
                       onRemoveTag={onRemoveTag}
+                      onTagClick={onTagClick}
                     />
                   ))}
                 </div>

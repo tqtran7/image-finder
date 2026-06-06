@@ -22,14 +22,15 @@ export function searchImages(filters: SearchFilters): ImageItem[] {
   const conditions: string[] = ["i.missing_at IS NULL"];
   const params: (string | number)[] = [];
 
-  if (collectionId) {
+  if (rootId) {
+    // Specific folder takes priority over collection-wide filter
+    conditions.push("i.root_id = ?");
+    params.push(rootId);
+  } else if (collectionId) {
     conditions.push(
       "i.root_id IN (SELECT id FROM roots WHERE collection_id = ?)",
     );
     params.push(collectionId);
-  } else if (rootId) {
-    conditions.push("i.root_id = ?");
-    params.push(rootId);
   }
 
   if (tags && tags.length > 0) {

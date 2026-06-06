@@ -9,6 +9,7 @@ interface TagEditorProps {
   commonTags: string[];
   vocabulary: string[];
   onRemoveCommonTag: (tagName: string) => void;
+  onTagClick: (tagName: string) => void;
 }
 
 export default function TagEditor({
@@ -16,6 +17,7 @@ export default function TagEditor({
   commonTags,
   vocabulary,
   onRemoveCommonTag,
+  onTagClick,
 }: TagEditorProps) {
   const [input, setInput] = useState("");
   const [open, setOpen] = useState(false);
@@ -72,7 +74,13 @@ export default function TagEditor({
                          bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300
                          rounded-full px-2 py-0.5"
             >
-              {tag}
+              <button
+                onClick={() => onTagClick(tag)}
+                className="hover:text-blue-900 dark:hover:text-blue-100"
+                aria-label={`Search for ${tag}`}
+              >
+                {tag}
+              </button>
               <button
                 onClick={() => onRemoveCommonTag(tag)}
                 className="hover:text-red-500 leading-none ml-0.5"

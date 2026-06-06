@@ -30,8 +30,8 @@ export default function CollectionSwitcher({
   function switchTo(id: number) {
     const p = new URLSearchParams(searchParams.toString());
     p.set("collection", String(id));
-    // Clear tag filters when switching collections
     p.delete("tags");
+    p.delete("root");
     router.replace("?" + p.toString(), { scroll: false });
   }
 

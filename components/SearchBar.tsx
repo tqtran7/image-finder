@@ -56,7 +56,10 @@ export default function SearchBar({
   }
 
   function clearAll() {
-    router.replace("/", { scroll: false });
+    const p = new URLSearchParams(searchParams.toString());
+    p.delete("tags");
+    const qs = p.toString();
+    router.replace(qs ? "?" + qs : "/", { scroll: false });
     setInput("");
   }
 

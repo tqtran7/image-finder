@@ -10,6 +10,7 @@ interface SelectionToolbarProps {
   images: ImageItem[];
   vocabulary: string[];
   onClearSelection: () => void;
+  onTagClick: (tagName: string) => void;
 }
 
 export default function SelectionToolbar({
@@ -17,6 +18,7 @@ export default function SelectionToolbar({
   images,
   vocabulary,
   onClearSelection,
+  onTagClick,
 }: SelectionToolbarProps) {
   const [isPending, startTransition] = useTransition();
   const [isAutoTagging, startAutoTag] = useTransition();
@@ -86,6 +88,7 @@ export default function SelectionToolbar({
         commonTags={commonTags}
         vocabulary={vocabulary}
         onRemoveCommonTag={handleRemoveCommonTag}
+        onTagClick={onTagClick}
       />
 
       {isPending && (

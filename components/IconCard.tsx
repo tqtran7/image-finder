@@ -14,8 +14,9 @@ export const CARD_H = 160; // img box + tags area (no filename)
 interface IconCardProps {
   image: ImageItem;
   selected: boolean;
-  onCardClick: (id: number, shiftKey: boolean) => void;
+  onCardClick: (id: number) => void;
   onRemoveTag: (imageId: number, tagName: string) => void;
+  onTagClick: (tagName: string) => void;
 }
 
 export default function IconCard({
@@ -23,6 +24,7 @@ export default function IconCard({
   selected,
   onCardClick,
   onRemoveTag,
+  onTagClick,
 }: IconCardProps) {
   const visibleTags = image.tags.slice(0, 2);
   const overflowCount = image.tags.length - visibleTags.length;
@@ -31,7 +33,7 @@ export default function IconCard({
     <div
       style={{ width: CARD_W }}
       className="flex flex-col items-center shrink-0 cursor-pointer select-none"
-      onClick={(e) => onCardClick(image.id, e.shiftKey)}
+      onClick={() => onCardClick(image.id)}
     >
       {/* Image box */}
       <div
@@ -70,7 +72,13 @@ export default function IconCard({
             className="inline-flex items-center gap-0.5 text-xs bg-zinc-200 dark:bg-zinc-600
                        text-zinc-600 dark:text-zinc-300 rounded px-1 py-0.5 max-w-full"
           >
-            <span className="truncate max-w-[56px]">{tag}</span>
+            <button
+              onClick={() => onTagClick(tag)}
+              className="truncate max-w-[56px] hover:text-blue-600 dark:hover:text-blue-400"
+              aria-label={`Search for ${tag}`}
+            >
+              {tag}
+            </button>
             <button
               onClick={() => onRemoveTag(image.id, tag)}
               className="text-zinc-400 dark:text-zinc-400 hover:text-red-500 leading-none shrink-0"
