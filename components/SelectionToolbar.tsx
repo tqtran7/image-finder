@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import TagEditor from "@/components/TagEditor";
-import { removeTag } from "@/lib/actions";
+import { removeTag, autoTagImages } from "@/lib/actions";
 import type { ImageItem } from "@/components/IconCard";
 
 interface SelectionToolbarProps {
@@ -19,6 +19,7 @@ export default function SelectionToolbar({
   onClearSelection,
 }: SelectionToolbarProps) {
   const [isPending, startTransition] = useTransition();
+  const [isAutoTagging, startAutoTag] = useTransition();
 
   const selectedList = images.filter((img) => selectedIds.has(img.id));
   const count = selectedList.length;
@@ -45,12 +46,28 @@ export default function SelectionToolbar({
         <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
           {count} selected
         </span>
-        <button
-          onClick={onClearSelection}
-          className="text-xs text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-        >
-          Clear
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              startAutoTag(async () => {
+                await autoTagImages(Array.from(selectedIds));
+              });
+            }}
+            disabled={isAutoTagging || count === 0}
+            title="Auto-tag with AI"
+            className="text-xs px-2 py-0.5 rounded-md
+                       bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300
+                       hover:bg-violet-200 dark:hover:bg-violet-800/40 disabled:opacity-50"
+          >
+            {isAutoTagging ? "Tagging…" : "✦ Auto-tag"}
+          </button>
+          <button
+            onClick={onClearSelection}
+            className="text-xs text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+          >
+            Clear
+          </button>
+        </div>
       </div>
 
       {/* Tag editor */}

@@ -5,6 +5,7 @@ import { statSync } from "node:fs";
 import path from "node:path";
 import { getDb } from "@/lib/db";
 import { scanRoot } from "@/lib/scan";
+import { getTagger } from "@/lib/taggers";
 
 // ── Roots ──────────────────────────────────────────────────────────────────
 
@@ -91,5 +92,92 @@ export async function removeTag(imageId: number, tagName: string) {
          AND tag_id = (SELECT id FROM tags WHERE name = lower(?) COLLATE NOCASE)`,
     )
     .run(imageId, tagName);
+  revalidatePath("/");
+}
+
+// ── AI auto-tagging ────────────────────────────────────────────────────────
+
+export async function autoTagImages(imageIds: number[]) {
+  console.log(`[autoTag] invoked with ${imageIds.length} ids:`, imageIds);
+  console.log(`[autoTag] ANTHROPIC_API_KEY present:`, !!process.env.ANTHROPIC_API_KEY);
+  const db = getDb();
+  const tagger = getTagger();
+  const now = Date.now();
+
+  const images = db
+    .prepare("SELECT id, abs_path, ext FROM images WHERE id IN (" + imageIds.map(() => "?").join(",") + ")")
+    .all(...imageIds) as { id: number; abs_path: string; ext: string }[];
+
+  const insert = db.prepare(
+    `INSERT OR IGNORE INTO tag_suggestions (image_id, name, model, created_at, status)
+     VALUES (?, lower(?), ?, ?, 'pending')`,
+  );
+
+  let tagged = 0;
+  const errors: string[] = [];
+
+  for (const img of images) {
+    let tags: string[];
+    try {
+      tags = await tagger.tag(img.abs_path, img.ext);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[autoTag] ${img.abs_path} failed:`, msg);
+      errors.push(`${img.id}: ${msg}`);
+      continue;
+    }
+    if (tags.length === 0) {
+      console.warn(`[autoTag] ${img.abs_path} (.${img.ext}) returned no tags`);
+    }
+    db.transaction(() => {
+      for (const tag of tags) {
+        if (tag) insert.run(img.id, tag, process.env.TAGGER_MODEL ?? "claude-haiku-4-5", now);
+      }
+    })();
+    if (tags.length > 0) tagged++;
+  }
+
+  console.log(`[autoTag] done: ${tagged}/${images.length} images tagged, ${errors.length} errors`);
+  revalidatePath("/");
+  return { tagged, total: images.length, errors };
+}
+
+export async function acceptSuggestions(imageId: number) {
+  const db = getDb();
+  const now = Date.now();
+
+  const suggestions = db
+    .prepare("SELECT id, name FROM tag_suggestions WHERE image_id = ? AND status = 'pending'")
+    .all(imageId) as { id: number; name: string }[];
+
+  const upsertTag = db.prepare(
+    `INSERT INTO tags (name) VALUES (lower(?))
+     ON CONFLICT(name) DO UPDATE SET name = name
+     RETURNING id`,
+  );
+  const insertImageTag = db.prepare(
+    `INSERT INTO image_tags (image_id, tag_id, source, created_at)
+     VALUES (?, ?, 'ai', ?)
+     ON CONFLICT(image_id, tag_id) DO NOTHING`,
+  );
+  const markAccepted = db.prepare(
+    "UPDATE tag_suggestions SET status = 'accepted' WHERE id = ?",
+  );
+
+  db.transaction(() => {
+    for (const s of suggestions) {
+      const tag = upsertTag.get(s.name) as { id: number } | undefined;
+      if (tag) insertImageTag.run(imageId, tag.id, now);
+      markAccepted.run(s.id);
+    }
+  })();
+
+  revalidatePath("/");
+}
+
+export async function rejectSuggestions(imageId: number) {
+  getDb()
+    .prepare("UPDATE tag_suggestions SET status = 'rejected' WHERE image_id = ? AND status = 'pending'")
+    .run(imageId);
   revalidatePath("/");
 }

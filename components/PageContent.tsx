@@ -4,16 +4,20 @@ import { useState, useCallback, useTransition, Suspense } from "react";
 import RootsManager from "@/components/RootsManager";
 import IconGrid from "@/components/IconGrid";
 import SelectionToolbar from "@/components/SelectionToolbar";
+import SuggestionsPanel from "@/components/SuggestionsPanel";
 import SearchBar from "@/components/SearchBar";
 import ThemeToggle from "@/components/ThemeToggle";
 import { removeTag } from "@/lib/actions";
 import type { RootWithCount } from "@/app/page";
 import type { ImageItem } from "@/components/IconCard";
+import type { SuggestionGroup } from "@/components/SuggestionsPanel";
+
 interface PageContentProps {
   roots: RootWithCount[];
   images: ImageItem[];
   vocabulary: string[];
   totalCount: number;
+  suggestions: SuggestionGroup[];
 }
 
 export default function PageContent({
@@ -21,6 +25,7 @@ export default function PageContent({
   images,
   vocabulary,
   totalCount,
+  suggestions,
 }: PageContentProps) {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [lastSelectedIdx, setLastSelectedIdx] = useState<number | null>(null);
@@ -90,6 +95,9 @@ export default function PageContent({
               onClearSelection={handleClearSelection}
             />
           )}
+
+          {/* AI suggestion review panel */}
+          <SuggestionsPanel groups={suggestions} />
         </aside>
 
         {/* Main — search bar + icon grid */}
