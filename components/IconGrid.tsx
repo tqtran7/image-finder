@@ -6,11 +6,22 @@ import IconCard, { CARD_W, CARD_H, type ImageItem } from "@/components/IconCard"
 
 const GAP = 8;
 
-export default function IconGrid({ images }: { images: ImageItem[] }) {
+interface IconGridProps {
+  images: ImageItem[];
+  selectedIds: Set<number>;
+  onCardClick: (id: number, shiftKey: boolean) => void;
+  onRemoveTag: (imageId: number, tagName: string) => void;
+}
+
+export default function IconGrid({
+  images,
+  selectedIds,
+  onCardClick,
+  onRemoveTag,
+}: IconGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
 
-  // Track container width so column count updates on resize
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -39,12 +50,12 @@ export default function IconGrid({ images }: { images: ImageItem[] }) {
       style={{ padding: GAP }}
     >
       {images.length === 0 ? (
-        <p className="text-sm text-zinc-400 text-center py-16">
+        <p className="text-sm text-zinc-400 dark:text-zinc-500 text-center py-16">
           No images found. Add a folder to get started.
         </p>
       ) : (
         <>
-          <p className="text-xs text-zinc-400 mb-3">
+          <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-3">
             {images.length.toLocaleString()} images
           </p>
           <div
@@ -73,7 +84,13 @@ export default function IconGrid({ images }: { images: ImageItem[] }) {
                   }}
                 >
                   {rowImages.map((img) => (
-                    <IconCard key={img.id} image={img} />
+                    <IconCard
+                      key={img.id}
+                      image={img}
+                      selected={selectedIds.has(img.id)}
+                      onCardClick={onCardClick}
+                      onRemoveTag={onRemoveTag}
+                    />
                   ))}
                 </div>
               );

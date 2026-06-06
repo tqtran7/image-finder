@@ -1,7 +1,6 @@
 import { getDb } from "@/lib/db";
-import RootsManager from "@/components/RootsManager";
-import IconGrid from "@/components/IconGrid";
-import type { ImageItem } from "@/components/IconCard";
+import PageContent from "@/components/PageContent";
+import { searchImages, parseFilters } from "@/lib/search";
 
 export interface RootWithCount {
   id: number;
@@ -12,8 +11,13 @@ export interface RootWithCount {
   image_count: number;
 }
 
-export default function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[]>>;
+}) {
   const db = getDb();
+  const params = await searchParams;
 
   const roots = db
     .prepare(
@@ -26,39 +30,28 @@ export default function Home() {
     )
     .all() as RootWithCount[];
 
-  const images = db
-    .prepare(
-      `SELECT id, filename, ext
-       FROM images
-       WHERE missing_at IS NULL
-       ORDER BY filename COLLATE NOCASE`,
-    )
-    .all() as ImageItem[];
+  const vocabulary = (
+    db
+      .prepare("SELECT name FROM tags ORDER BY name COLLATE NOCASE")
+      .all() as { name: string }[]
+  ).map((r) => r.name);
+
+  const totalCount = (
+    db
+      .prepare("SELECT COUNT(*) AS n FROM images WHERE missing_at IS NULL")
+      .get() as { n: number }
+  ).n;
+
+  const filters = parseFilters(params);
+  const images = searchImages(filters);
 
   return (
-    <div className="h-screen flex flex-col font-sans bg-zinc-50">
-      {/* Header */}
-      <header className="shrink-0 bg-white border-b px-6 py-3 flex items-center">
-        <h1 className="text-base font-semibold text-zinc-900">Icon Finder</h1>
-      </header>
-
-      {/* Body: sidebar + grid */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar — folders */}
-        <aside className="w-72 shrink-0 border-r bg-white flex flex-col overflow-y-auto">
-          <div className="px-4 py-4 border-b">
-            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">
-              Folders
-            </h2>
-            <RootsManager roots={roots} />
-          </div>
-        </aside>
-
-        {/* Main — icon grid */}
-        <main className="flex-1 flex flex-col overflow-hidden bg-zinc-50">
-          <IconGrid images={images} />
-        </main>
-      </div>
-    </div>
+    <PageContent
+      roots={roots}
+      images={images}
+      vocabulary={vocabulary}
+      totalCount={totalCount}
+      filters={filters}
+    />
   );
 }
