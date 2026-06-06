@@ -1,36 +1,108 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Image Finder
 
-## Getting Started
+A local web app for browsing, searching, and AI-tagging image asset libraries. Point it at folders on your machine, let an AI describe every image, then find anything instantly by keyword.
 
-First, run the development server:
+<!-- screenshots go here -->
+
+## Features
+
+- **Folder scanning** — add any local directory as a root; the app recursively indexes every image inside
+- **Collections** — group folders into named collections, each with its own custom AI tagging prompt
+- **AI auto-tagging** — generate descriptive tags for every image using Claude (Anthropic), Ollama, or LM Studio
+- **Full-text search** — search across tags, filenames, and labels in real time
+- **Tag editor** — manually add, edit, or remove tags on any image
+- **Suggestions panel** — AI-suggested tags you can accept or dismiss in bulk
+- **Virtualized grid** — handles libraries with thousands of images without slowdown
+- **Dark/light theme** — toggle between themes, preference is persisted
+- **SQLite database** — all metadata stored locally in a single file, no server required
+
+## Requirements
+
+- [Node.js](https://nodejs.org) v18+ (v23 recommended)
+- One of the following AI backends:
+  - **Claude** — an [Anthropic API key](https://console.anthropic.com/settings/keys)
+  - **Ollama** — [Ollama](https://ollama.com) running locally with a vision model pulled
+  - **LM Studio** — [LM Studio](https://lmstudio.ai) running locally with a vision model loaded and the local server enabled
+
+## Installation
+
+```bash
+git clone https://github.com/your-username/image-finder.git
+cd image-finder
+npm install
+```
+
+## Configuration
+
+Copy the example env file and fill in the values for your chosen AI backend:
+
+```bash
+cp .env.local.example .env.local
+```
+
+### Option A — Claude (Anthropic)
+
+```env
+TAGGER_PROVIDER=claude
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Optional — defaults to claude-haiku-4-5
+TAGGER_MODEL=claude-haiku-4-5
+```
+
+### Option B — Ollama
+
+```env
+TAGGER_PROVIDER=ollama
+
+# Optional — defaults shown
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=llava
+```
+
+Pull a vision model first if you haven't already:
+
+```bash
+ollama pull llava
+```
+
+### Option C — LM Studio
+
+```env
+TAGGER_PROVIDER=lmstudio
+
+# Optional — defaults shown
+LMSTUDIO_BASE_URL=http://127.0.0.1:1234
+LMSTUDIO_MODEL=qwen/qwen2.5-vl-7b
+```
+
+Make sure the **local server** is enabled in LM Studio (Server tab → Start Server) and a vision-capable model is loaded.
+
+## Running
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+For a production build:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm start
+```
 
-## Learn More
+## Usage
 
-To learn more about Next.js, take a look at the following resources:
+1. **Add a folder** — click "Add Folder" and enter an absolute path to a directory containing images
+2. **Scan** — the app indexes all images found recursively
+3. **Auto-tag** — select images and click "Auto Tag", or tag an entire collection at once
+4. **Search** — type in the search bar to filter by tag, filename, or label
+5. **Collections** — create collections to group related folders and give each its own tagging prompt
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Supported Image Formats
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+`png` `jpg` / `jpeg` `gif` `webp` `svg`
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+> `ico`, `bmp`, and `avif` are not supported by most vision models and are skipped during tagging.
