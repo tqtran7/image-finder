@@ -3,12 +3,13 @@
 export interface ImageItem {
   id: number;
   filename: string;
+  abs_path: string;
   ext: string;
   tags: string[];
 }
 
 export const CARD_W = 128;
-export const CARD_H = 184; // img box + filename + tags area
+export const CARD_H = 160; // img box + tags area (no filename)
 
 interface IconCardProps {
   image: ImageItem;
@@ -44,7 +45,7 @@ export default function IconCard({
           loading="lazy"
           src={`/api/file?id=${image.id}`}
           alt={image.filename}
-          style={{ maxWidth: CARD_W - 16, maxHeight: CARD_W - 16 }}
+          style={{ maxWidth: CARD_W - 5, maxHeight: CARD_W - 5 }}
           className="object-contain"
           draggable={false}
         />
@@ -56,15 +57,6 @@ export default function IconCard({
           </span>
         )}
       </div>
-
-      {/* Filename */}
-      <p
-        style={{ width: CARD_W }}
-        className="text-xs text-zinc-500 dark:text-zinc-400 truncate text-center mt-1 px-1"
-        title={image.filename}
-      >
-        {image.filename}
-      </p>
 
       {/* Tag chips */}
       <div

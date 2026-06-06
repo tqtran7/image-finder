@@ -62,7 +62,7 @@ export default function CollectionEditor({ collection, isDefault, onClose }: Col
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-2xl w-[480px] flex flex-col overflow-hidden border border-zinc-200 dark:border-zinc-700">
+      <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-2xl w-[680px] flex flex-col overflow-hidden border border-zinc-200 dark:border-zinc-700">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200 dark:border-zinc-700">
           <h2 className="font-semibold text-sm text-zinc-800 dark:text-zinc-200">
@@ -103,7 +103,7 @@ export default function CollectionEditor({ collection, isDefault, onClose }: Col
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              rows={4}
+              rows={12}
               placeholder={DEFAULT_TAG_PROMPT}
               className="w-full text-sm px-3 py-2 rounded-lg resize-y
                          bg-zinc-100 dark:bg-zinc-700 border border-transparent

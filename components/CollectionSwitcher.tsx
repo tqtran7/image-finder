@@ -87,6 +87,22 @@ export default function CollectionSwitcher({
         ))}
       </div>
 
+      {/* Active collection's custom prompt preview — click to edit */}
+      {active?.prompt && (
+        <button
+          type="button"
+          onClick={() => onEditCollection(active)}
+          className="mt-1 mb-2 px-0.5 text-left w-full group"
+        >
+          <p className="text-[11px] text-zinc-400 dark:text-zinc-500 leading-relaxed line-clamp-3
+                        group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors">
+            <span className="font-semibold text-zinc-500 dark:text-zinc-400
+                             group-hover:text-zinc-700 dark:group-hover:text-zinc-200">Prompt:</span>{" "}
+            {active.prompt}
+          </p>
+        </button>
+      )}
+
       {/* Create new collection */}
       {creating ? (
         <form onSubmit={handleCreateSubmit} className="flex gap-1.5">

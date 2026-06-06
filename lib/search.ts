@@ -10,6 +10,7 @@ export interface SearchFilters {
 interface RawImage {
   id: number;
   filename: string;
+  abs_path: string;
   ext: string;
   tag_names: string;
 }
@@ -51,7 +52,7 @@ export function searchImages(filters: SearchFilters): ImageItem[] {
 
   const rows = db
     .prepare(
-      `SELECT i.id, i.filename, i.ext,
+      `SELECT i.id, i.filename, i.abs_path, i.ext,
               COALESCE(GROUP_CONCAT(t2.name, '|||'), '') AS tag_names
        FROM images i
        LEFT JOIN image_tags it2 ON it2.image_id = i.id
@@ -65,6 +66,7 @@ export function searchImages(filters: SearchFilters): ImageItem[] {
   return rows.map((r) => ({
     id: r.id,
     filename: r.filename,
+    abs_path: r.abs_path,
     ext: r.ext,
     tags: r.tag_names ? r.tag_names.split("|||") : [],
   }));

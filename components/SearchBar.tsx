@@ -73,28 +73,10 @@ export default function SearchBar({
 
   return (
     <div className="shrink-0 border-b border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-2.5">
-      <div className="flex items-center gap-2 flex-wrap">
-        {/* Active tag chips */}
-        {activeTags.map((tag) => (
-          <span
-            key={tag}
-            className="inline-flex items-center gap-0.5 text-xs
-                       bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300
-                       rounded-full px-2.5 py-1 shrink-0"
-          >
-            {tag}
-            <button
-              onClick={() => removeTag(tag)}
-              className="hover:text-red-500 leading-none ml-1"
-              aria-label={`Remove ${tag} filter`}
-            >
-              ×
-            </button>
-          </span>
-        ))}
-
-        {/* Tag input with autocomplete */}
-        <div ref={dropdownRef} className="relative">
+      {/* Row 1: full-width input + count/clear */}
+      <div className="flex items-center gap-2">
+        {/* Tag input with autocomplete — stretches to fill */}
+        <div ref={dropdownRef} className="relative flex-1">
           <input
             ref={inputRef}
             value={input}
@@ -121,7 +103,7 @@ export default function SearchBar({
             placeholder={
               activeTags.length === 0 ? "Search by tag…" : "Add another tag…"
             }
-            className="text-sm px-3 py-1.5 rounded-lg min-w-[160px]
+            className="w-full text-sm px-3 py-1.5 rounded-lg
                        bg-zinc-100 dark:bg-zinc-700 border border-transparent
                        focus:border-zinc-300 dark:focus:border-zinc-500 focus:outline-none
                        text-zinc-800 dark:text-zinc-200 placeholder-zinc-400"
@@ -153,22 +135,43 @@ export default function SearchBar({
         </div>
 
         {/* Result count + clear */}
-        <div className="ml-auto flex items-center gap-3 shrink-0">
-          {hasFilters && (
+        {hasFilters && (
+          <div className="flex items-center gap-3 shrink-0">
             <span className="text-xs text-zinc-400 dark:text-zinc-500">
               {filteredCount.toLocaleString()} / {totalCount.toLocaleString()}
             </span>
-          )}
-          {hasFilters && (
             <button
               onClick={clearAll}
               className="text-xs text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200"
             >
               Clear
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
+
+      {/* Row 2: active tag chips (only when tags are selected) */}
+      {activeTags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {activeTags.map((tag) => (
+            <span
+              key={tag}
+              className="inline-flex items-center gap-0.5 text-xs
+                         bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300
+                         rounded-full px-2.5 py-1"
+            >
+              {tag}
+              <button
+                onClick={() => removeTag(tag)}
+                className="hover:text-red-500 leading-none ml-1"
+                aria-label={`Remove ${tag} filter`}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

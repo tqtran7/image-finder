@@ -70,6 +70,16 @@ export default function SelectionToolbar({
         </div>
       </div>
 
+      {/* Absolute path — only when exactly one image is selected */}
+      {count === 1 && (
+        <p
+          className="text-[11px] text-zinc-400 dark:text-zinc-500 break-all leading-relaxed mb-3"
+          title={selectedList[0].abs_path}
+        >
+          {selectedList[0].abs_path}
+        </p>
+      )}
+
       {/* Tag editor */}
       <TagEditor
         selectedIds={Array.from(selectedIds)}
