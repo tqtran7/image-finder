@@ -2,7 +2,7 @@
 
 A local web app for browsing, searching, and AI-tagging image asset libraries. Point it at folders on your machine, let an AI describe every image, then find anything instantly by keyword.
 
-<!-- screenshots go here -->
+<img width="1690" height="1181" alt="image" src="https://github.com/user-attachments/assets/4f62f5f8-4320-4942-aa1e-feae793ad26c" />
 
 ## Features
 
