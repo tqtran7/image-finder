@@ -10,10 +10,20 @@ import {
 } from "@/lib/actions";
 import { useAutoTagBatch } from "@/components/useAutoTagBatch";
 import AutoTagModal from "@/components/AutoTagModal";
+import CollectionPromptPreview from "@/components/CollectionPromptPreview";
 import type { AutoTagFilter } from "@/lib/actions";
 import type { RootWithCount } from "@/app/page";
+import type { CollectionItem } from "@/components/CollectionSwitcher";
 
-export default function FolderDetails({ root }: { root: RootWithCount }) {
+export default function FolderDetails({
+  root,
+  activeCollection,
+  onEditCollection,
+}: {
+  root: RootWithCount;
+  activeCollection: CollectionItem | null;
+  onEditCollection: (collection: CollectionItem) => void;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [scanningId, setScanningId] = useState<number | null>(null);
@@ -94,6 +104,14 @@ export default function FolderDetails({ root }: { root: RootWithCount }) {
           {root.image_count.toLocaleString()} images
         </p>
       </div>
+
+      {/* Active collection's custom prompt preview — click to edit */}
+      {activeCollection?.prompt && (
+        <CollectionPromptPreview
+          collection={activeCollection}
+          onEdit={onEditCollection}
+        />
+      )}
 
       {/* Auto-tag progress */}
       {progress && (

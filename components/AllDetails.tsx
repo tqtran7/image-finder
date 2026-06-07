@@ -4,16 +4,22 @@ import { useState } from "react";
 import { getImagesForCollection } from "@/lib/actions";
 import { useAutoTagBatch } from "@/components/useAutoTagBatch";
 import AutoTagModal from "@/components/AutoTagModal";
+import CollectionPromptPreview from "@/components/CollectionPromptPreview";
 import type { AutoTagFilter } from "@/lib/actions";
+import type { CollectionItem } from "@/components/CollectionSwitcher";
 
 export default function AllDetails({
   collectionId,
   collectionName,
   totalCount,
+  activeCollection,
+  onEditCollection,
 }: {
   collectionId: number;
   collectionName: string;
   totalCount: number;
+  activeCollection: CollectionItem | null;
+  onEditCollection: (collection: CollectionItem) => void;
 }) {
   const [showModal, setShowModal] = useState(false);
   const { status, progress, summary, start, pause, resume, stop } = useAutoTagBatch();
@@ -46,6 +52,12 @@ export default function AllDetails({
           {totalCount.toLocaleString()} images
         </p>
       </div>
+
+      {/* Active collection's custom prompt preview — click to edit */}
+      <CollectionPromptPreview
+        collection={activeCollection}
+        onEdit={onEditCollection}
+      />
 
       {/* Auto-tag progress */}
       {progress && (

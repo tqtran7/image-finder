@@ -171,8 +171,6 @@ export default function PageContent({
               activeCollectionId={activeCollectionId}
               totalCount={totalCount}
               totalTaggedCount={totalTaggedCount}
-              activeCollection={collections.find((c) => c.id === activeCollectionId) ?? null}
-              onEditCollection={setEditingCollection}
             />
           </div>
         </aside>
@@ -226,6 +224,8 @@ export default function PageContent({
           collectionId={activeCollectionId}
           collectionName={collectionName}
           totalCount={totalCount}
+          activeCollection={collections.find((c) => c.id === activeCollectionId) ?? null}
+          onEditCollection={setEditingCollection}
           width={right.width}
         />
       </div>

@@ -7,6 +7,7 @@ import TagSuggestions from "@/components/TagSuggestions";
 import type { FileDetailGroup } from "@/components/TagSuggestions";
 import type { RootWithCount } from "@/app/page";
 import type { ImageItem } from "@/components/IconCard";
+import type { CollectionItem } from "@/components/CollectionSwitcher";
 
 interface DetailsPanelProps {
   activeRoot: RootWithCount | null;
@@ -18,6 +19,8 @@ interface DetailsPanelProps {
   collectionId: number;
   collectionName: string;
   totalCount: number;
+  activeCollection: CollectionItem | null;
+  onEditCollection: (collection: CollectionItem) => void;
   width?: number;
 }
 
@@ -31,6 +34,8 @@ export default function DetailsPanel({
   collectionId,
   collectionName,
   totalCount,
+  activeCollection,
+  onEditCollection,
   width,
 }: DetailsPanelProps) {
   const hasSelection = selectedIds.size > 0;
@@ -50,9 +55,17 @@ export default function DetailsPanel({
           collectionId={collectionId}
           collectionName={collectionName}
           totalCount={totalCount}
+          activeCollection={activeCollection}
+          onEditCollection={onEditCollection}
         />
       )}
-      {hasFolder && <FolderDetails root={activeRoot!} />}
+      {hasFolder && (
+        <FolderDetails
+          root={activeRoot!}
+          activeCollection={activeCollection}
+          onEditCollection={onEditCollection}
+        />
+      )}
       {hasSelection && (
         <FileDetails
           selectedIds={selectedIds}

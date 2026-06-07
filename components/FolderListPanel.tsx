@@ -4,22 +4,17 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import FolderPicker from "@/components/FolderPicker";
 import type { RootWithCount } from "@/app/page";
-import type { CollectionItem } from "@/components/CollectionSwitcher";
 
 export default function FolderListPanel({
   roots,
   activeCollectionId,
   totalCount,
   totalTaggedCount,
-  activeCollection,
-  onEditCollection,
 }: {
   roots: RootWithCount[];
   activeCollectionId: number;
   totalCount: number;
   totalTaggedCount: number;
-  activeCollection: CollectionItem | null;
-  onEditCollection: (collection: CollectionItem) => void;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -43,22 +38,6 @@ export default function FolderListPanel({
 
   return (
     <div>
-      {/* Active collection's custom prompt preview — click to edit */}
-      {activeCollection?.prompt && (
-        <button
-          type="button"
-          onClick={() => onEditCollection(activeCollection)}
-          className="mb-3 px-0.5 text-left w-full group"
-        >
-          <p className="text-[11px] text-zinc-400 dark:text-zinc-500 leading-relaxed line-clamp-3
-                        group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors">
-            <span className="font-semibold text-zinc-500 dark:text-zinc-400
-                             group-hover:text-zinc-700 dark:group-hover:text-zinc-200">Prompt:</span>{" "}
-            {activeCollection.prompt}
-          </p>
-        </button>
-      )}
-
       <ul className="space-y-1 mb-4">
         {/* "All" virtual folder */}
         <li>
