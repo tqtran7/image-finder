@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useCallback, useTransition, Suspense } from "react";
+import { useState, useCallback, useTransition, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import RootsManager from "@/components/RootsManager";
+import FolderListPanel from "@/components/FolderListPanel";
+import DetailsPanel from "@/components/DetailsPanel";
 import IconGrid from "@/components/IconGrid";
-import SelectionToolbar from "@/components/SelectionToolbar";
-import SuggestionsPanel from "@/components/SuggestionsPanel";
 import CollectionSwitcher from "@/components/CollectionSwitcher";
 import CollectionEditor from "@/components/CollectionEditor";
 import SearchBar from "@/components/SearchBar";
@@ -13,15 +12,58 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { removeTag } from "@/lib/actions";
 import type { RootWithCount } from "@/app/page";
 import type { ImageItem } from "@/components/IconCard";
-import type { SuggestionGroup } from "@/components/SuggestionsPanel";
+import type { FileDetailGroup } from "@/components/TagSuggestions";
 import type { CollectionItem } from "@/components/CollectionSwitcher";
+
+const MIN_PANEL = 180;
+const MAX_PANEL = 560;
+
+function useResize(initial: number, side: "left" | "right") {
+  const [width, setWidth] = useState(initial);
+  const dragging = useRef(false);
+  const startX = useRef(0);
+  const startW = useRef(0);
+
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    dragging.current = true;
+    startX.current = e.clientX;
+    startW.current = width;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, [width]);
+
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      if (!dragging.current) return;
+      const delta = side === "left"
+        ? e.clientX - startX.current
+        : startX.current - e.clientX;
+      setWidth(Math.min(MAX_PANEL, Math.max(MIN_PANEL, startW.current + delta)));
+    }
+    function onUp() {
+      if (!dragging.current) return;
+      dragging.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [side]);
+
+  return { width, onMouseDown };
+}
 
 interface PageContentProps {
   roots: RootWithCount[];
   images: ImageItem[];
   vocabulary: string[];
   totalCount: number;
-  suggestions: SuggestionGroup[];
+  suggestions: FileDetailGroup[];
   collections: CollectionItem[];
   activeCollectionId: number;
 }
@@ -38,9 +80,14 @@ export default function PageContent({
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const activeRootId = searchParams.get("root") ? Number(searchParams.get("root")) : null;
+  const activeRoot = roots.find((r) => r.id === activeRootId) ?? null;
+
   const [editingCollection, setEditingCollection] = useState<CollectionItem | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [, startTransition] = useTransition();
+  const left = useResize(288, "left");
+  const right = useResize(288, "right");
 
   const handleCardClick = useCallback((id: number) => {
     setSelectedIds((prev) => {
@@ -83,7 +130,10 @@ export default function PageContent({
       {/* Body */}
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-72 shrink-0 border-r border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex flex-col overflow-y-auto">
+        <aside
+          style={{ width: left.width }}
+          className="shrink-0 border-r border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex flex-col overflow-y-auto"
+        >
           {/* Collection switcher */}
           <Suspense>
             <CollectionSwitcher
@@ -96,24 +146,17 @@ export default function PageContent({
           {/* Folders section */}
           <div className="px-4 py-4">
             <h2 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
-              Folders
+              Collection folders
             </h2>
-            <RootsManager roots={roots} activeCollectionId={activeCollectionId} />
+            <FolderListPanel roots={roots} activeCollectionId={activeCollectionId} />
           </div>
-
-          {/* Tag panel — shown when items are selected */}
-          {selectedIds.size > 0 && (
-            <SelectionToolbar
-              selectedIds={selectedIds}
-              images={images}
-              vocabulary={vocabulary}
-              onTagClick={handleTagClick}
-            />
-          )}
-
-          {/* AI suggestion review panel */}
-          <SuggestionsPanel groups={suggestions} />
         </aside>
+
+        {/* Left resize handle */}
+        <div
+          onMouseDown={left.onMouseDown}
+          className="w-1 shrink-0 cursor-col-resize hover:bg-violet-400 dark:hover:bg-violet-500 transition-colors"
+        />
 
         {editingCollection && (
           <CollectionEditor
@@ -140,6 +183,25 @@ export default function PageContent({
             onTagClick={handleTagClick}
           />
         </main>
+
+        {/* Right resize handle — only when the details panel is open */}
+        {(selectedIds.size > 0 || activeRoot !== null || suggestions.length > 0) && (
+          <div
+            onMouseDown={right.onMouseDown}
+            className="w-1 shrink-0 cursor-col-resize hover:bg-violet-400 dark:hover:bg-violet-500 transition-colors"
+          />
+        )}
+
+        {/* Right details panel — folder info or image selection */}
+        <DetailsPanel
+          activeRoot={activeRoot}
+          selectedIds={selectedIds}
+          images={images}
+          vocabulary={vocabulary}
+          suggestions={suggestions}
+          onTagClick={handleTagClick}
+          width={right.width}
+        />
       </div>
     </div>
   );

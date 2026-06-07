@@ -69,10 +69,14 @@ export class LMStudioTagger {
       if (!match) return [];
       const parsed = JSON.parse(match[0]);
       if (!Array.isArray(parsed)) return [];
-      return parsed
-        .filter((t): t is string => typeof t === "string")
-        .map((t) => t.toLowerCase().trim())
-        .filter(Boolean);
+      return [
+        ...new Set(
+          parsed
+            .filter((t): t is string => typeof t === "string")
+            .map((t) => t.toLowerCase().trim())
+            .filter(Boolean),
+        ),
+      ];
     } catch {
       return [];
     }

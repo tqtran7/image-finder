@@ -92,6 +92,7 @@ function migrate(db: DB): void {
     CREATE INDEX IF NOT EXISTS idx_images_hash      ON images(content_hash);
     CREATE INDEX IF NOT EXISTS idx_tags_name        ON tags(name);
     CREATE INDEX IF NOT EXISTS idx_suggestions_img  ON tag_suggestions(image_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_suggestions_unique ON tag_suggestions(image_id, name);
   `);
 
   // ── roots.collection_id (added incrementally on existing DBs) ──────────────

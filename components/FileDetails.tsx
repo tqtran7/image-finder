@@ -5,19 +5,19 @@ import TagEditor from "@/components/TagEditor";
 import { removeTag, autoTagImages, clearGeneratedTags } from "@/lib/actions";
 import type { ImageItem } from "@/components/IconCard";
 
-interface SelectionToolbarProps {
+interface FileDetailsProps {
   selectedIds: Set<number>;
   images: ImageItem[];
   vocabulary: string[];
   onTagClick: (tagName: string) => void;
 }
 
-export default function SelectionToolbar({
+export default function FileDetails({
   selectedIds,
   images,
   vocabulary,
   onTagClick,
-}: SelectionToolbarProps) {
+}: FileDetailsProps) {
   const [isPending, startTransition] = useTransition();
   const [isAutoTagging, startAutoTag] = useTransition();
   const [isClearing, startClear] = useTransition();
@@ -51,9 +51,6 @@ export default function SelectionToolbar({
     <div className="border-b border-zinc-200 dark:border-zinc-700 px-4 py-4">
       {/* Header row */}
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
-          {count} selected
-        </span>
         <div className="flex items-center gap-2">
           <button
             onClick={() => {
@@ -81,19 +78,24 @@ export default function SelectionToolbar({
                        bg-zinc-100 dark:bg-zinc-700/50 text-zinc-600 dark:text-zinc-300
                        hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50"
           >
-            {isClearing ? "Clearing…" : "Clear generated tags"}
+            {isClearing ? "Clearing…" : "Clear AI tags"}
           </button>
         </div>
       </div>
 
-      {/* Absolute path — only when exactly one image is selected */}
+      {/* File name + path — only when exactly one image is selected */}
       {count === 1 && (
-        <p
-          className="text-[11px] text-zinc-400 dark:text-zinc-500 break-all leading-relaxed mb-3"
-          title={selectedList[0].abs_path}
-        >
-          {selectedList[0].abs_path}
-        </p>
+        <div className="mb-3">
+          <p className="text-sm font-medium text-zinc-700 dark:text-zinc-200 truncate">
+            {selectedList[0].abs_path.split(/[\\/]/).pop()}
+          </p>
+          <p
+            className="mt-2 text-xs text-zinc-400 dark:text-zinc-500 break-all leading-relaxed"
+            title={selectedList[0].abs_path}
+          >
+            {selectedList[0].abs_path}
+          </p>
+        </div>
       )}
 
       {/* Tag editor */}

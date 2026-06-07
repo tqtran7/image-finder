@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/db";
 import PageContent from "@/components/PageContent";
 import { searchImages, parseFilters } from "@/lib/search";
-import type { SuggestionGroup } from "@/components/SuggestionsPanel";
+import type { FileDetailGroup } from "@/components/TagSuggestions";
 import type { CollectionItem } from "@/components/CollectionSwitcher";
 
 export interface RootWithCount {
@@ -76,7 +76,7 @@ export default async function Home({
 
   const rawSuggestions = db
     .prepare(
-      `SELECT ts.image_id, i.filename, ts.name
+      `SELECT DISTINCT ts.image_id, i.filename, ts.name
        FROM tag_suggestions ts
        JOIN images i ON i.id = ts.image_id
        JOIN roots r ON r.id = i.root_id
@@ -86,7 +86,7 @@ export default async function Home({
     .all(activeCollectionId) as { image_id: number; filename: string; name: string }[];
 
   // Group by image_id
-  const suggestionMap = new Map<number, SuggestionGroup>();
+  const suggestionMap = new Map<number, FileDetailGroup>();
   for (const row of rawSuggestions) {
     if (!suggestionMap.has(row.image_id)) {
       suggestionMap.set(row.image_id, { imageId: row.image_id, filename: row.filename, tags: [] });

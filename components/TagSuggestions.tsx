@@ -3,17 +3,17 @@
 import { useTransition } from "react";
 import { acceptSuggestions, rejectSuggestions } from "@/lib/actions";
 
-export interface SuggestionGroup {
+export interface FileDetailGroup {
   imageId: number;
   filename: string;
   tags: string[];
 }
 
-interface SuggestionsPanelProps {
-  groups: SuggestionGroup[];
+interface FileDetailsProps {
+  groups: FileDetailGroup[];
 }
 
-export default function SuggestionsPanel({ groups }: SuggestionsPanelProps) {
+export default function TagSuggestions({ groups }: FileDetailsProps) {
   if (groups.length === 0) return null;
 
   return (
@@ -23,14 +23,14 @@ export default function SuggestionsPanel({ groups }: SuggestionsPanelProps) {
       </h2>
       <div className="flex flex-col gap-3">
         {groups.map((g) => (
-          <SuggestionRow key={g.imageId} group={g} />
+          <FileDetailRow key={g.imageId} group={g} />
         ))}
       </div>
     </div>
   );
 }
 
-function SuggestionRow({ group }: { group: SuggestionGroup }) {
+function FileDetailRow({ group }: { group: FileDetailGroup }) {
   const [isPending, startTransition] = useTransition();
 
   function accept() {
