@@ -5,7 +5,7 @@ import { statSync } from "node:fs";
 import path from "node:path";
 import { getDb } from "@/lib/db";
 import { scanRoot } from "@/lib/scan";
-import { getTagger } from "@/lib/taggers";
+import { getTagger, getTaggerModel } from "@/lib/taggers";
 
 // ── Collections ────────────────────────────────────────────────────────────
 
@@ -129,36 +129,53 @@ export async function addTags(imageIds: number[], tagNames: string[]) {
 }
 
 export async function clearTagsForRoot(rootId: number) {
-  getDb()
-    .prepare(
+  const db = getDb();
+  db.transaction(() => {
+    db.prepare(
       `DELETE FROM image_tags
        WHERE image_id IN (SELECT id FROM images WHERE root_id = ?)
          AND source = 'ai'`,
-    )
-    .run(rootId);
+    ).run(rootId);
+    db.prepare(
+      `UPDATE images SET tagged_at = NULL, tagger_model = NULL WHERE root_id = ?`,
+    ).run(rootId);
+  })();
   revalidatePath("/");
 }
 
 export async function clearGeneratedTags(imageIds: number[]) {
   if (imageIds.length === 0) return;
-  getDb()
-    .prepare(
-      `DELETE FROM image_tags
-       WHERE source = 'ai'
-         AND image_id IN (${imageIds.map(() => "?").join(",")})`,
-    )
-    .run(...imageIds);
+  const db = getDb();
+  const placeholders = imageIds.map(() => "?").join(",");
+  db.transaction(() => {
+    db.prepare(
+      `DELETE FROM image_tags WHERE source = 'ai' AND image_id IN (${placeholders})`,
+    ).run(...imageIds);
+    db.prepare(
+      `UPDATE images SET tagged_at = NULL, tagger_model = NULL WHERE id IN (${placeholders})`,
+    ).run(...imageIds);
+  })();
   revalidatePath("/");
 }
 
 export async function removeTag(imageId: number, tagName: string) {
-  getDb()
-    .prepare(
+  const db = getDb();
+  db.transaction(() => {
+    db.prepare(
       `DELETE FROM image_tags
        WHERE image_id = ?
          AND tag_id = (SELECT id FROM tags WHERE name = lower(?) COLLATE NOCASE)`,
-    )
-    .run(imageId, tagName);
+    ).run(imageId, tagName);
+    // Clear tagging stamp only when no AI tags remain — so the next batch run
+    // re-tags this image if the skip-already-tagged filter is on.
+    db.prepare(
+      `UPDATE images SET tagged_at = NULL, tagger_model = NULL
+       WHERE id = ?
+         AND NOT EXISTS (
+           SELECT 1 FROM image_tags WHERE image_id = ? AND source = 'ai'
+         )`,
+    ).run(imageId, imageId);
+  })();
   revalidatePath("/");
 }
 
@@ -204,7 +221,7 @@ export async function autoTagImages(imageIds: number[]) {
     }
     db.transaction(() => {
       for (const tag of tags) {
-        if (tag) insert.run(img.id, tag, process.env.TAGGER_MODEL ?? "claude-haiku-4-5", now);
+        if (tag) insert.run(img.id, tag, getTaggerModel(), now);
       }
     })();
     if (tags.length > 0) tagged++;
@@ -215,25 +232,72 @@ export async function autoTagImages(imageIds: number[]) {
   return { tagged, total: images.length, errors };
 }
 
-/** Returns the IDs of all non-missing images in a root, ordered by filename. */
-export async function getImagesForRoot(rootId: number): Promise<{ id: number }[]> {
-  return getDb()
-    .prepare(
-      "SELECT id FROM images WHERE root_id = ? AND missing_at IS NULL ORDER BY filename COLLATE NOCASE",
-    )
-    .all(rootId) as { id: number }[];
+/** Rules governing which images a batch auto-tag run should (re-)tag. */
+export interface AutoTagFilter {
+  /** Skip images that already have auto-tags (the resumable default). */
+  skipTagged: boolean;
+  /** When skipping, still re-tag images whose tagger_model differs from current. */
+  retagIfDifferentModel: boolean;
+  /** When skipping, still re-tag images tagged longer ago than this many days. */
+  retagOlderThanDays: number | null;
 }
 
-/** Returns the IDs of all non-missing images in a collection, ordered by filename. */
-export async function getImagesForCollection(collectionId: number): Promise<{ id: number }[]> {
+/**
+ * Builds the SQL predicate + bound params for an AutoTagFilter, to be ANDed onto
+ * the base `missing_at IS NULL` clause. When skipTagged is off, no filter applies
+ * (re-tag everything). When on, an image qualifies if it's never been tagged, OR
+ * it matches one of the enabled re-tag exceptions.
+ */
+function buildTagFilterClause(
+  filter: AutoTagFilter,
+): { sql: string; params: (string | number)[] } {
+  if (!filter.skipTagged) return { sql: "", params: [] };
+
+  const ors = ["tagged_at IS NULL"];
+  const params: (string | number)[] = [];
+
+  if (filter.retagIfDifferentModel) {
+    ors.push("(tagged_at IS NOT NULL AND tagger_model IS NOT ?)");
+    params.push(getTaggerModel());
+  }
+  if (filter.retagOlderThanDays != null) {
+    const cutoff = Date.now() - filter.retagOlderThanDays * 86_400_000;
+    ors.push("(tagged_at IS NOT NULL AND tagged_at < ?)");
+    params.push(cutoff);
+  }
+
+  return { sql: ` AND (${ors.join(" OR ")})`, params };
+}
+
+/** Returns the IDs of non-missing images in a root that match the filter, ordered by filename. */
+export async function getImagesForRoot(
+  rootId: number,
+  filter: AutoTagFilter,
+): Promise<{ id: number }[]> {
+  const { sql, params } = buildTagFilterClause(filter);
+  return getDb()
+    .prepare(
+      `SELECT id FROM images
+       WHERE root_id = ? AND missing_at IS NULL${sql}
+       ORDER BY filename COLLATE NOCASE`,
+    )
+    .all(rootId, ...params) as { id: number }[];
+}
+
+/** Returns the IDs of non-missing images in a collection that match the filter, ordered by filename. */
+export async function getImagesForCollection(
+  collectionId: number,
+  filter: AutoTagFilter,
+): Promise<{ id: number }[]> {
+  const { sql, params } = buildTagFilterClause(filter);
   return getDb()
     .prepare(
       `SELECT i.id FROM images i
        JOIN roots r ON r.id = i.root_id
-       WHERE r.collection_id = ? AND i.missing_at IS NULL
+       WHERE r.collection_id = ? AND i.missing_at IS NULL${sql}
        ORDER BY i.filename COLLATE NOCASE`,
     )
-    .all(collectionId) as { id: number }[];
+    .all(collectionId, ...params) as { id: number }[];
 }
 
 /**
@@ -272,8 +336,6 @@ export async function autoTagAndAcceptImage(
     return { tagged: false, error: msg };
   }
 
-  if (tags.length === 0) return { tagged: false };
-
   const upsertTag = db.prepare(
     `INSERT INTO tags (name) VALUES (lower(?))
      ON CONFLICT(name) DO UPDATE SET name = name
@@ -284,16 +346,22 @@ export async function autoTagAndAcceptImage(
      VALUES (?, ?, 'ai', ?)
      ON CONFLICT(image_id, tag_id) DO NOTHING`,
   );
+  const markTagged = db.prepare(
+    "UPDATE images SET tagged_at = ?, tagger_model = ? WHERE id = ?",
+  );
 
+  // The image was processed without error — stamp it (even with zero tags) so
+  // batch runs treat it as done and don't retry it forever.
   db.transaction(() => {
     for (const name of tags) {
       if (!name) continue;
       const tag = upsertTag.get(name) as { id: number } | undefined;
       if (tag) insertImageTag.run(img.id, tag.id, now);
     }
+    markTagged.run(now, getTaggerModel(), img.id);
   })();
 
-  return { tagged: true };
+  return { tagged: tags.length > 0 };
 }
 
 export async function acceptSuggestions(imageId: number) {

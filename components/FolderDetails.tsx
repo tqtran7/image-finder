@@ -6,27 +6,23 @@ import {
   removeRoot,
   rescanRoot,
   getImagesForRoot,
-  autoTagAndAcceptImage,
   clearTagsForRoot,
 } from "@/lib/actions";
+import { useAutoTagBatch } from "@/components/useAutoTagBatch";
+import AutoTagModal from "@/components/AutoTagModal";
+import type { AutoTagFilter } from "@/lib/actions";
 import type { RootWithCount } from "@/app/page";
-
-interface TagProgress {
-  done: number;
-  total: number;
-  errors: number;
-}
 
 export default function FolderDetails({ root }: { root: RootWithCount }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [scanningId, setScanningId] = useState<number | null>(null);
-  const [tagProgress, setTagProgress] = useState<TagProgress | null>(null);
-  const [tagSummary, setTagSummary] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const { status, progress, summary, start, pause, resume, stop } = useAutoTagBatch();
   const [confirmAction, setConfirmAction] = useState<"remove" | "clear" | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const isTagging = tagProgress !== null;
+  const isTagging = status !== "idle";
 
   function handleCopyPath() {
     navigator.clipboard.writeText(root.path);
@@ -45,39 +41,8 @@ export default function FolderDetails({ root }: { root: RootWithCount }) {
     });
   }
 
-  async function handleAutoTag() {
-    if (
-      !window.confirm(
-        `Auto-tag all ${root.image_count.toLocaleString()} images in "${root.label}"?\n` +
-          `Tags will be applied automatically without review.`,
-      )
-    )
-      return;
-
-    setTagSummary(null);
-    const imgs = await getImagesForRoot(root.id);
-    if (imgs.length === 0) {
-      setTagSummary("No images to tag");
-      return;
-    }
-
-    setTagProgress({ done: 0, total: imgs.length, errors: 0 });
-    let tagged = 0;
-    let errors = 0;
-
-    for (const img of imgs) {
-      const result = await autoTagAndAcceptImage(img.id);
-      if (result.tagged) tagged++;
-      if (result.error) errors++;
-      setTagProgress((prev) => (prev ? { ...prev, done: prev.done + 1, errors } : null));
-    }
-
-    setTagProgress(null);
-    router.refresh();
-
-    const parts = [`${tagged}/${imgs.length} tagged`];
-    if (errors > 0) parts.push(`${errors} errors`);
-    setTagSummary(parts.join(", "));
+  function handleConfirm(filter: AutoTagFilter) {
+    start((f) => getImagesForRoot(root.id, f), filter);
   }
 
   function doClearTags() {
@@ -95,8 +60,8 @@ export default function FolderDetails({ root }: { root: RootWithCount }) {
     });
   }
 
-  const pct = tagProgress
-    ? Math.round((tagProgress.done / tagProgress.total) * 100)
+  const pct = progress
+    ? Math.round((progress.done / progress.total) * 100)
     : 0;
 
   return (
@@ -131,14 +96,14 @@ export default function FolderDetails({ root }: { root: RootWithCount }) {
       </div>
 
       {/* Auto-tag progress */}
-      {tagProgress && (
+      {progress && (
         <div>
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-violet-600 dark:text-violet-400 font-medium">
-              Auto-tagging…
+              {status === "paused" ? "Paused" : "Auto-tagging…"}
             </span>
             <span className="text-xs text-zinc-400 dark:text-zinc-500">
-              {tagProgress.done} / {tagProgress.total}
+              {progress.done} / {progress.total}
             </span>
           </div>
           <div className="h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
@@ -147,29 +112,59 @@ export default function FolderDetails({ root }: { root: RootWithCount }) {
               style={{ width: `${pct}%` }}
             />
           </div>
-          {tagProgress.errors > 0 && (
-            <p className="text-xs text-red-400 mt-1">{tagProgress.errors} errors</p>
+          {progress.errors > 0 && (
+            <p className="text-xs text-red-400 mt-1">{progress.errors} errors</p>
           )}
         </div>
       )}
-      {tagSummary && (
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">{tagSummary}</p>
+      {summary && (
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">{summary}</p>
       )}
 
       <div className="border-t border-zinc-200 dark:border-zinc-700" />
 
       {/* Actions */}
       <div className="flex flex-col gap-0.5">
-        <button
-          onClick={handleAutoTag}
-          disabled={pending || isTagging || root.image_count === 0}
-          className="w-full text-left text-xs font-medium px-2 py-2 rounded-lg
-                     text-violet-600 hover:bg-violet-50
-                     dark:text-violet-400 dark:hover:bg-violet-900/20
-                     disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          ✦ Auto-tag entire folder
-        </button>
+        {!isTagging && (
+          <button
+            onClick={() => setShowModal(true)}
+            disabled={pending || root.image_count === 0}
+            className="w-full text-left text-xs font-medium px-2 py-2 rounded-lg
+                       text-violet-600 hover:bg-violet-50
+                       dark:text-violet-400 dark:hover:bg-violet-900/20
+                       disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            ✦ Auto-tag entire folder
+          </button>
+        )}
+
+        {status === "running" && (
+          <button
+            onClick={pause}
+            className="w-full text-left text-xs font-medium px-2 py-2 rounded-lg
+                       text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20"
+          >
+            ⏸ Pause
+          </button>
+        )}
+        {status === "paused" && (
+          <button
+            onClick={resume}
+            className="w-full text-left text-xs font-medium px-2 py-2 rounded-lg
+                       text-violet-600 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-900/20"
+          >
+            ▶ Resume
+          </button>
+        )}
+        {isTagging && (
+          <button
+            onClick={stop}
+            className="w-full text-left text-xs font-medium px-2 py-2 rounded-lg
+                       text-zinc-600 hover:bg-red-50 dark:text-zinc-300 dark:hover:bg-red-900/20"
+          >
+            ■ Stop
+          </button>
+        )}
         <button
           onClick={() => setConfirmAction("clear")}
           disabled={pending || isTagging}
@@ -249,6 +244,15 @@ export default function FolderDetails({ root }: { root: RootWithCount }) {
             </button>
           </div>
         </div>
+      )}
+
+      {showModal && (
+        <AutoTagModal
+          title={`Auto-tag "${root.label}"`}
+          description={`${root.image_count.toLocaleString()} images — tags applied automatically without review.`}
+          onConfirm={handleConfirm}
+          onClose={() => setShowModal(false)}
+        />
       )}
     </div>
   );

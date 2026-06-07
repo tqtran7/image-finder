@@ -4,6 +4,11 @@ export interface Tagger {
   tag(absPath: string, ext: string, prompt?: string): Promise<string[]>;
 }
 
+/** The model name recorded alongside auto-generated tags/suggestions. */
+export function getTaggerModel(): string {
+  return process.env.TAGGER_MODEL ?? "claude-haiku-4-5";
+}
+
 export function getTagger(): Tagger {
   const provider = (process.env.TAGGER_PROVIDER ?? "claude").toLowerCase().trim();
 

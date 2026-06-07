@@ -1,14 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { getImagesForCollection, autoTagAndAcceptImage } from "@/lib/actions";
-
-interface TagProgress {
-  done: number;
-  total: number;
-  errors: number;
-}
+import { getImagesForCollection } from "@/lib/actions";
+import { useAutoTagBatch } from "@/components/useAutoTagBatch";
+import AutoTagModal from "@/components/AutoTagModal";
+import type { AutoTagFilter } from "@/lib/actions";
 
 export default function AllDetails({
   collectionId,
@@ -19,49 +15,17 @@ export default function AllDetails({
   collectionName: string;
   totalCount: number;
 }) {
-  const router = useRouter();
-  const [tagProgress, setTagProgress] = useState<TagProgress | null>(null);
-  const [tagSummary, setTagSummary] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const { status, progress, summary, start, pause, resume, stop } = useAutoTagBatch();
 
-  const isTagging = tagProgress !== null;
+  const isActive = status !== "idle";
 
-  async function handleAutoTag() {
-    if (
-      !window.confirm(
-        `Auto-tag all ${totalCount.toLocaleString()} images in "${collectionName}"?\n` +
-          `Tags will be applied automatically without review.`,
-      )
-    )
-      return;
-
-    setTagSummary(null);
-    const imgs = await getImagesForCollection(collectionId);
-    if (imgs.length === 0) {
-      setTagSummary("No images to tag");
-      return;
-    }
-
-    setTagProgress({ done: 0, total: imgs.length, errors: 0 });
-    let tagged = 0;
-    let errors = 0;
-
-    for (const img of imgs) {
-      const result = await autoTagAndAcceptImage(img.id);
-      if (result.tagged) tagged++;
-      if (result.error) errors++;
-      setTagProgress((prev) => (prev ? { ...prev, done: prev.done + 1, errors } : null));
-    }
-
-    setTagProgress(null);
-    router.refresh();
-
-    const parts = [`${tagged}/${imgs.length} tagged`];
-    if (errors > 0) parts.push(`${errors} errors`);
-    setTagSummary(parts.join(", "));
+  function handleConfirm(filter: AutoTagFilter) {
+    start((f) => getImagesForCollection(collectionId, f), filter);
   }
 
-  const pct = tagProgress
-    ? Math.round((tagProgress.done / tagProgress.total) * 100)
+  const pct = progress
+    ? Math.round((progress.done / progress.total) * 100)
     : 0;
 
   return (
@@ -84,14 +48,14 @@ export default function AllDetails({
       </div>
 
       {/* Auto-tag progress */}
-      {tagProgress && (
+      {progress && (
         <div>
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-violet-600 dark:text-violet-400 font-medium">
-              Auto-tagging…
+              {status === "paused" ? "Paused" : "Auto-tagging…"}
             </span>
             <span className="text-xs text-zinc-400 dark:text-zinc-500">
-              {tagProgress.done} / {tagProgress.total}
+              {progress.done} / {progress.total}
             </span>
           </div>
           <div className="h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
@@ -100,30 +64,69 @@ export default function AllDetails({
               style={{ width: `${pct}%` }}
             />
           </div>
-          {tagProgress.errors > 0 && (
-            <p className="text-xs text-red-400 mt-1">{tagProgress.errors} errors</p>
+          {progress.errors > 0 && (
+            <p className="text-xs text-red-400 mt-1">{progress.errors} errors</p>
           )}
         </div>
       )}
-      {tagSummary && (
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">{tagSummary}</p>
+      {summary && (
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">{summary}</p>
       )}
 
       <div className="border-t border-zinc-200 dark:border-zinc-700" />
 
       {/* Actions */}
       <div className="flex flex-col gap-0.5">
-        <button
-          onClick={handleAutoTag}
-          disabled={isTagging || totalCount === 0}
-          className="w-full text-left text-xs font-medium px-2 py-2 rounded-lg
-                     text-violet-600 hover:bg-violet-50
-                     dark:text-violet-400 dark:hover:bg-violet-900/20
-                     disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          ✦ Auto-tag entire collection
-        </button>
+        {!isActive && (
+          <button
+            onClick={() => setShowModal(true)}
+            disabled={totalCount === 0}
+            className="w-full text-left text-xs font-medium px-2 py-2 rounded-lg
+                       text-violet-600 hover:bg-violet-50
+                       dark:text-violet-400 dark:hover:bg-violet-900/20
+                       disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            ✦ Auto-tag entire collection
+          </button>
+        )}
+
+        {status === "running" && (
+          <button
+            onClick={pause}
+            className="w-full text-left text-xs font-medium px-2 py-2 rounded-lg
+                       text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20"
+          >
+            ⏸ Pause
+          </button>
+        )}
+        {status === "paused" && (
+          <button
+            onClick={resume}
+            className="w-full text-left text-xs font-medium px-2 py-2 rounded-lg
+                       text-violet-600 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-900/20"
+          >
+            ▶ Resume
+          </button>
+        )}
+        {isActive && (
+          <button
+            onClick={stop}
+            className="w-full text-left text-xs font-medium px-2 py-2 rounded-lg
+                       text-zinc-600 hover:bg-red-50 dark:text-zinc-300 dark:hover:bg-red-900/20"
+          >
+            ■ Stop
+          </button>
+        )}
       </div>
+
+      {showModal && (
+        <AutoTagModal
+          title={`Auto-tag "${collectionName}"`}
+          description={`${totalCount.toLocaleString()} images — tags applied automatically without review.`}
+          onConfirm={handleConfirm}
+          onClose={() => setShowModal(false)}
+        />
+      )}
     </div>
   );
 }

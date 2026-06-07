@@ -120,6 +120,38 @@ function migrate(db: DB): void {
     "CREATE INDEX IF NOT EXISTS idx_roots_collection ON roots(collection_id)",
   );
 
+  // ── images.tagged_at / images.tagger_model (added incrementally) ───────────
+  // Track when an image was last auto-tagged and by which model, so batch runs
+  // can skip already-tagged images and apply re-tag rules (different model / age).
+  const imageCols = db.prepare("PRAGMA table_info(images)").all() as {
+    name: string;
+  }[];
+  if (!imageCols.some((c) => c.name === "tagged_at")) {
+    db.exec("ALTER TABLE images ADD COLUMN tagged_at INTEGER");
+  }
+  if (!imageCols.some((c) => c.name === "tagger_model")) {
+    db.exec("ALTER TABLE images ADD COLUMN tagger_model TEXT");
+  }
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_images_tagged_at ON images(tagged_at)",
+  );
+
+  // Backfill: images that already have AI tags but no tagged_at (tagged before
+  // these columns existed) get stamped so the first batch run doesn't redo them.
+  db.exec(`
+    UPDATE images SET
+      tagged_at = (
+        SELECT MAX(it.created_at) FROM image_tags it
+        WHERE it.image_id = images.id AND it.source = 'ai'
+      ),
+      tagger_model = 'unknown'
+    WHERE tagged_at IS NULL
+      AND EXISTS (
+        SELECT 1 FROM image_tags it
+        WHERE it.image_id = images.id AND it.source = 'ai'
+      );
+  `);
+
   // ── Ensure a fallback "Default" collection exists, then backfill roots ─────
   const count = (
     db.prepare("SELECT COUNT(*) AS n FROM collections").get() as { n: number }
