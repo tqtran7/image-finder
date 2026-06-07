@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import FolderPicker from "@/components/FolderPicker";
-import { removeRoot, rescanRoot, getImagesForRoot, autoTagAndAcceptImage } from "@/lib/actions";
+import { removeRoot, rescanRoot, getImagesForRoot, autoTagAndAcceptImage, clearTagsForRoot } from "@/lib/actions";
 import type { RootWithCount } from "@/app/page";
 
 interface TagProgress {
@@ -29,6 +29,8 @@ export default function RootsManager({
   const [scanningId, setScanningId] = useState<number | null>(null);
   const [tagProgress, setTagProgress] = useState<TagProgress | null>(null);
   const [tagSummary, setTagSummary] = useState<string | null>(null);
+  const [clearConfirmId, setClearConfirmId] = useState<number | null>(null);
+  const [removeConfirmId, setRemoveConfirmId] = useState<number | null>(null);
 
   const isTagging = tagProgress !== null;
 
@@ -43,6 +45,11 @@ export default function RootsManager({
   }
 
   function handleRemove(id: number) {
+    setRemoveConfirmId(id);
+  }
+
+  function confirmRemove(id: number) {
+    setRemoveConfirmId(null);
     startTransition(async () => {
       await removeRoot(id);
     });
@@ -56,6 +63,18 @@ export default function RootsManager({
       } finally {
         setScanningId(null);
       }
+    });
+  }
+
+  function handleClearTags(root: RootWithCount) {
+    setClearConfirmId(root.id);
+  }
+
+  function confirmClearTags(root: RootWithCount) {
+    setClearConfirmId(null);
+    startTransition(async () => {
+      await clearTagsForRoot(root.id);
+      router.refresh();
     });
   }
 
@@ -140,6 +159,14 @@ export default function RootsManager({
                     </p>
                   </div>
                   <button
+                    onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(root.path); }}
+                    title="Copy path"
+                    className="text-xs text-zinc-400 hover:text-zinc-600
+                               dark:text-zinc-500 dark:hover:text-zinc-300 shrink-0"
+                  >
+                    ⎘
+                  </button>
+                  <button
                     onClick={(e) => { e.stopPropagation(); handleRemove(root.id); }}
                     disabled={pending || isTagging}
                     title="Remove folder"
@@ -198,6 +225,17 @@ export default function RootsManager({
                     >
                       {scanningId === root.id ? "Scanning…" : "↻ Rescan"}
                     </button>
+                    <button
+                      onClick={() => handleClearTags(root)}
+                      disabled={pending || isTagging}
+                      title="Clear AI-generated tags in this folder (manual tags are kept)"
+                      className="inline-flex items-center gap-1 text-xs font-medium
+                                 text-zinc-400 hover:text-zinc-700
+                                 dark:text-zinc-500 dark:hover:text-zinc-300
+                                 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      ✕ Clear AI tags
+                    </button>
                   </div>
                 )}
               </li>
@@ -233,6 +271,82 @@ export default function RootsManager({
           onClose={() => setPickerOpen(false)}
         />
       )}
+
+      {removeConfirmId !== null && (() => {
+        const root = roots.find((r) => r.id === removeConfirmId);
+        if (!root) return null;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-700 p-6 max-w-sm w-full mx-4">
+              <h2 className="text-sm font-semibold text-zinc-800 dark:text-zinc-100 mb-2">
+                Remove folder?
+              </h2>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-5 leading-relaxed">
+                This will remove{" "}
+                <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                  &quot;{root.label}&quot;
+                </span>{" "}
+                and its {root.image_count.toLocaleString()} images from the collection. The files on disk will not be deleted.
+              </p>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setRemoveConfirmId(null)}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700
+                             text-zinc-600 dark:text-zinc-400
+                             hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => confirmRemove(root.id)}
+                  className="text-xs px-3 py-1.5 rounded-lg
+                             bg-red-500 hover:bg-red-600 text-white font-medium"
+                >
+                  Remove folder
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {clearConfirmId !== null && (() => {
+        const root = roots.find((r) => r.id === clearConfirmId);
+        if (!root) return null;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-700 p-6 max-w-sm w-full mx-4">
+              <h2 className="text-sm font-semibold text-zinc-800 dark:text-zinc-100 mb-2">
+                Clear AI-generated tags?
+              </h2>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-5 leading-relaxed">
+                This will remove all AI-generated tags from every image in{" "}
+                <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                  &quot;{root.label}&quot;
+                </span>{" "}
+                ({root.image_count.toLocaleString()} images). Manually-added tags are kept. This cannot be undone.
+              </p>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setClearConfirmId(null)}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700
+                             text-zinc-600 dark:text-zinc-400
+                             hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => confirmClearTags(root)}
+                  className="text-xs px-3 py-1.5 rounded-lg
+                             bg-red-500 hover:bg-red-600 text-white font-medium"
+                >
+                  Clear AI tags
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

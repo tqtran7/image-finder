@@ -6,6 +6,7 @@ export interface ImageItem {
   abs_path: string;
   ext: string;
   tags: string[];
+  aiTags: string[];
 }
 
 export const CARD_W = 128;
@@ -69,8 +70,11 @@ export default function IconCard({
         {visibleTags.map((tag) => (
           <span
             key={tag}
-            className="inline-flex items-center gap-0.5 text-xs bg-zinc-200 dark:bg-zinc-600
-                       text-zinc-600 dark:text-zinc-300 rounded px-1 py-0.5 max-w-full"
+            className={`inline-flex items-center gap-0.5 text-xs rounded px-1 py-0.5 max-w-full ${
+              image.aiTags.includes(tag)
+                ? "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300"
+                : "bg-zinc-200 dark:bg-zinc-600 text-zinc-600 dark:text-zinc-300"
+            }`}
           >
             <button
               onClick={() => onTagClick(tag)}

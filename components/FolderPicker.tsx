@@ -16,6 +16,7 @@ interface FolderPickerProps {
 
 export default function FolderPicker({ collectionId, onClose }: FolderPickerProps) {
   const [currentPath, setCurrentPath] = useState<string | null>(null);
+  const [pathInput, setPathInput] = useState("");
   const [entries, setEntries] = useState<FsEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +31,7 @@ export default function FolderPicker({ collectionId, onClose }: FolderPickerProp
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to list directory");
       setCurrentPath(p);
+      setPathInput(p ?? "");
       setEntries(data.entries ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -45,11 +47,18 @@ export default function FolderPicker({ collectionId, onClose }: FolderPickerProp
     else navigate(parent);
   }
 
+  function commitPathInput() {
+    const trimmed = pathInput.trim();
+    if (trimmed) navigate(trimmed);
+    else navigate(null);
+  }
+
   function handleAdd() {
-    if (!currentPath) return;
+    const target = pathInput.trim() || currentPath;
+    if (!target) return;
     startTransition(async () => {
       try {
-        await addRoot(currentPath, collectionId);
+        await addRoot(target, collectionId);
         onClose();
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
@@ -80,19 +89,32 @@ export default function FolderPicker({ collectionId, onClose }: FolderPickerProp
           </button>
         </div>
 
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 px-5 py-2 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-700 min-h-[40px]">
+        {/* Path input */}
+        <div className="flex items-center gap-2 px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-700">
           {currentPath && (
             <button
               onClick={goUp}
-              className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 font-mono"
+              title="Go up"
+              className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 font-mono shrink-0"
             >
               ← up
             </button>
           )}
-          <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono truncate">
-            {currentPath ?? "Choose a drive"}
-          </span>
+          <input
+            type="text"
+            value={pathInput}
+            onChange={(e) => setPathInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitPathInput();
+              else if (e.key === "Escape") setPathInput(currentPath ?? "");
+            }}
+            onBlur={commitPathInput}
+            placeholder="Paste or type a path…"
+            className="flex-1 min-w-0 text-xs font-mono rounded-md px-2 py-1
+                       bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-600
+                       text-zinc-800 dark:text-zinc-200 placeholder-zinc-400
+                       focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
 
         {/* Directory listing */}
@@ -140,7 +162,7 @@ export default function FolderPicker({ collectionId, onClose }: FolderPickerProp
             </button>
             <button
               onClick={handleAdd}
-              disabled={!currentPath || isPending}
+              disabled={(!currentPath && !pathInput.trim()) || isPending}
               className="px-4 py-1.5 rounded-lg text-sm bg-zinc-900 dark:bg-zinc-100
                          text-white dark:text-zinc-900
                          hover:bg-zinc-700 dark:hover:bg-white

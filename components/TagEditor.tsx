@@ -7,6 +7,8 @@ interface TagEditorProps {
   selectedIds: number[];
   /** Tags shared by ALL selected images — shown as removable chips */
   commonTags: string[];
+  /** Subset of commonTags that are AI-generated in every selected image */
+  commonAiTags?: string[];
   vocabulary: string[];
   onRemoveCommonTag: (tagName: string) => void;
   onTagClick: (tagName: string) => void;
@@ -15,6 +17,7 @@ interface TagEditorProps {
 export default function TagEditor({
   selectedIds,
   commonTags,
+  commonAiTags = [],
   vocabulary,
   onRemoveCommonTag,
   onTagClick,
@@ -70,9 +73,11 @@ export default function TagEditor({
           {commonTags.map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center gap-0.5 text-xs
-                         bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300
-                         rounded-full px-2 py-0.5"
+              className={`inline-flex items-center gap-0.5 text-xs rounded-full px-2 py-0.5 ${
+                commonAiTags.includes(tag)
+                  ? "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300"
+                  : "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+              }`}
             >
               <button
                 onClick={() => onTagClick(tag)}

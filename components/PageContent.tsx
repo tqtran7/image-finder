@@ -107,7 +107,6 @@ export default function PageContent({
               selectedIds={selectedIds}
               images={images}
               vocabulary={vocabulary}
-              onClearSelection={handleClearSelection}
               onTagClick={handleTagClick}
             />
           )}

@@ -2,14 +2,13 @@
 
 import { useTransition } from "react";
 import TagEditor from "@/components/TagEditor";
-import { removeTag, autoTagImages } from "@/lib/actions";
+import { removeTag, autoTagImages, clearGeneratedTags } from "@/lib/actions";
 import type { ImageItem } from "@/components/IconCard";
 
 interface SelectionToolbarProps {
   selectedIds: Set<number>;
   images: ImageItem[];
   vocabulary: string[];
-  onClearSelection: () => void;
   onTagClick: (tagName: string) => void;
 }
 
@@ -17,11 +16,11 @@ export default function SelectionToolbar({
   selectedIds,
   images,
   vocabulary,
-  onClearSelection,
   onTagClick,
 }: SelectionToolbarProps) {
   const [isPending, startTransition] = useTransition();
   const [isAutoTagging, startAutoTag] = useTransition();
+  const [isClearing, startClear] = useTransition();
 
   const selectedList = images.filter((img) => selectedIds.has(img.id));
   const count = selectedList.length;
@@ -31,6 +30,13 @@ export default function SelectionToolbar({
       ? []
       : selectedList[0].tags.filter((tag) =>
           selectedList.every((img) => img.tags.includes(tag)),
+        );
+
+  const commonAiTags =
+    count === 0
+      ? []
+      : commonTags.filter((tag) =>
+          selectedList.every((img) => img.aiTags.includes(tag)),
         );
 
   function handleRemoveCommonTag(tagName: string) {
@@ -64,10 +70,18 @@ export default function SelectionToolbar({
             {isAutoTagging ? "Tagging…" : "✦ Auto-tag"}
           </button>
           <button
-            onClick={onClearSelection}
-            className="text-xs text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+            onClick={() => {
+              startClear(async () => {
+                await clearGeneratedTags(Array.from(selectedIds));
+              });
+            }}
+            disabled={isClearing || count === 0}
+            title="Clear AI-generated tags (manual tags are kept)"
+            className="text-xs px-2 py-0.5 rounded-md
+                       bg-zinc-100 dark:bg-zinc-700/50 text-zinc-600 dark:text-zinc-300
+                       hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50"
           >
-            Clear
+            {isClearing ? "Clearing…" : "Clear generated tags"}
           </button>
         </div>
       </div>
@@ -86,6 +100,7 @@ export default function SelectionToolbar({
       <TagEditor
         selectedIds={Array.from(selectedIds)}
         commonTags={commonTags}
+        commonAiTags={commonAiTags}
         vocabulary={vocabulary}
         onRemoveCommonTag={handleRemoveCommonTag}
         onTagClick={onTagClick}

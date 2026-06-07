@@ -128,6 +128,29 @@ export async function addTags(imageIds: number[], tagNames: string[]) {
   revalidatePath("/");
 }
 
+export async function clearTagsForRoot(rootId: number) {
+  getDb()
+    .prepare(
+      `DELETE FROM image_tags
+       WHERE image_id IN (SELECT id FROM images WHERE root_id = ?)
+         AND source = 'ai'`,
+    )
+    .run(rootId);
+  revalidatePath("/");
+}
+
+export async function clearGeneratedTags(imageIds: number[]) {
+  if (imageIds.length === 0) return;
+  getDb()
+    .prepare(
+      `DELETE FROM image_tags
+       WHERE source = 'ai'
+         AND image_id IN (${imageIds.map(() => "?").join(",")})`,
+    )
+    .run(...imageIds);
+  revalidatePath("/");
+}
+
 export async function removeTag(imageId: number, tagName: string) {
   getDb()
     .prepare(
