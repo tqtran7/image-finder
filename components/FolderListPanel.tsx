@@ -8,61 +8,93 @@ import type { RootWithCount } from "@/app/page";
 export default function FolderListPanel({
   roots,
   activeCollectionId,
+  totalCount,
 }: {
   roots: RootWithCount[];
   activeCollectionId: number;
+  totalCount: number;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeRootId = searchParams.get("root") ? Number(searchParams.get("root")) : null;
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  function handleFolderClick(rootId: number) {
+  function handleAllClick() {
     const p = new URLSearchParams(searchParams.toString());
-    if (activeRootId === rootId) {
-      p.delete("root");
-    } else {
-      p.set("root", String(rootId));
-    }
+    p.delete("root");
     router.replace("?" + p.toString(), { scroll: false });
   }
 
+  function handleFolderClick(rootId: number) {
+    if (activeRootId === rootId) return;
+    const p = new URLSearchParams(searchParams.toString());
+    p.set("root", String(rootId));
+    router.replace("?" + p.toString(), { scroll: false });
+  }
+
+  const isAll = activeRootId === null;
+
   return (
     <div>
-      {roots.length === 0 ? (
-        <p className="text-xs text-zinc-400 dark:text-zinc-500 py-2">
+      <ul className="space-y-1 mb-4">
+        {/* "All" virtual folder */}
+        <li>
+          <div
+            onClick={handleAllClick}
+            className={`rounded-lg border px-3 py-1.5 flex items-center gap-2
+                        cursor-pointer transition-colors
+                        ${
+                          isAll
+                            ? "border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                            : "border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-600"
+                        }`}
+          >
+            <p
+              className={`text-xs font-medium truncate min-w-0 flex-1 ${
+                isAll ? "text-blue-700 dark:text-blue-300" : "text-zinc-800 dark:text-zinc-200"
+              }`}
+            >
+              All
+            </p>
+            <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-full">
+              {totalCount.toLocaleString()}
+            </span>
+          </div>
+        </li>
+
+        {roots.map((root) => (
+          <li key={root.id}>
+            <div
+              onClick={() => handleFolderClick(root.id)}
+              className={`rounded-lg border px-3 py-1.5 flex items-center gap-2
+                          cursor-pointer transition-colors
+                          ${
+                            activeRootId === root.id
+                              ? "border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                              : "border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-600"
+                          }`}
+            >
+              <p
+                className={`text-xs font-medium truncate min-w-0 flex-1 ${
+                  activeRootId === root.id
+                    ? "text-blue-700 dark:text-blue-300"
+                    : "text-zinc-800 dark:text-zinc-200"
+                }`}
+              >
+                {root.label}
+              </p>
+              <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-full">
+                {root.image_count.toLocaleString()}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      {roots.length === 0 && (
+        <p className="text-xs text-zinc-400 dark:text-zinc-500 pb-2">
           No folders added yet.
         </p>
-      ) : (
-        <ul className="space-y-1 mb-4">
-          {roots.map((root) => (
-            <li key={root.id}>
-              <div
-                onClick={() => handleFolderClick(root.id)}
-                className={`rounded-lg border px-3 py-1.5 flex items-center gap-2
-                            cursor-pointer transition-colors
-                            ${
-                              activeRootId === root.id
-                                ? "border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                                : "border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-600"
-                            }`}
-              >
-                <p
-                  className={`text-xs font-medium truncate min-w-0 flex-1 ${
-                    activeRootId === root.id
-                      ? "text-blue-700 dark:text-blue-300"
-                      : "text-zinc-800 dark:text-zinc-200"
-                  }`}
-                >
-                  {root.label}
-                </p>
-                <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-full">
-                  {root.image_count.toLocaleString()}
-                </span>
-              </div>
-            </li>
-          ))}
-        </ul>
       )}
 
       <button

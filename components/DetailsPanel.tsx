@@ -2,6 +2,7 @@
 
 import FileDetails from "@/components/FileDetails";
 import FolderDetails from "@/components/FolderDetails";
+import AllDetails from "@/components/AllDetails";
 import TagSuggestions from "@/components/TagSuggestions";
 import type { FileDetailGroup } from "@/components/TagSuggestions";
 import type { RootWithCount } from "@/app/page";
@@ -14,6 +15,9 @@ interface DetailsPanelProps {
   vocabulary: string[];
   suggestions: FileDetailGroup[];
   onTagClick: (tagName: string) => void;
+  collectionId: number;
+  collectionName: string;
+  totalCount: number;
   width?: number;
 }
 
@@ -24,19 +28,30 @@ export default function DetailsPanel({
   vocabulary,
   suggestions,
   onTagClick,
+  collectionId,
+  collectionName,
+  totalCount,
   width,
 }: DetailsPanelProps) {
   const hasSelection = selectedIds.size > 0;
   const hasFolder = activeRoot !== null;
+  const isAll = activeRoot === null;
   const hasSuggestions = suggestions.length > 0;
 
-  if (!hasSelection && !hasFolder && !hasSuggestions) return null;
+  if (!isAll && !hasSelection && !hasFolder && !hasSuggestions) return null;
 
   return (
     <aside
       style={width !== undefined ? { width } : undefined}
       className="shrink-0 border-l border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex flex-col overflow-y-auto"
     >
+      {isAll && (
+        <AllDetails
+          collectionId={collectionId}
+          collectionName={collectionName}
+          totalCount={totalCount}
+        />
+      )}
       {hasFolder && <FolderDetails root={activeRoot!} />}
       {hasSelection && (
         <FileDetails

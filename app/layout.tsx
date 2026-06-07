@@ -28,10 +28,13 @@ export default function RootLayout({
       lang="en"
       // Start with dark class to match the default theme and avoid a flash
       className={`${geistSans.variable} ${geistMono.variable} h-full dark`}
+      suppressHydrationWarning
     >
       <head>
         {/* Run before paint to apply the saved theme without a flash */}
         <script
+          type={typeof window === "undefined" ? "text/javascript" : "text/plain"}
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{
             __html: `(function(){var t=localStorage.getItem('theme');if(t==='light'){document.documentElement.classList.remove('dark')}else{document.documentElement.classList.add('dark')}})()`,
           }}

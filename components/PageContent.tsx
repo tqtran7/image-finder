@@ -82,10 +82,26 @@ export default function PageContent({
 
   const activeRootId = searchParams.get("root") ? Number(searchParams.get("root")) : null;
   const activeRoot = roots.find((r) => r.id === activeRootId) ?? null;
+  const collectionName =
+    collections.find((c) => c.id === activeCollectionId)?.name ?? "All";
 
   const [editingCollection, setEditingCollection] = useState<CollectionItem | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [, startTransition] = useTransition();
+
+  // Auto-select first image when folder or collection changes
+  const prevCollectionRef = useRef(activeCollectionId);
+  const prevRootRef = useRef(activeRootId);
+  useEffect(() => {
+    if (
+      prevCollectionRef.current !== activeCollectionId ||
+      prevRootRef.current !== activeRootId
+    ) {
+      prevCollectionRef.current = activeCollectionId;
+      prevRootRef.current = activeRootId;
+      setSelectedIds(images.length > 0 ? new Set([images[0].id]) : new Set());
+    }
+  }, [activeCollectionId, activeRootId, images]);
   const left = useResize(288, "left");
   const right = useResize(288, "right");
 
@@ -148,7 +164,7 @@ export default function PageContent({
             <h2 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
               Collection folders
             </h2>
-            <FolderListPanel roots={roots} activeCollectionId={activeCollectionId} />
+            <FolderListPanel roots={roots} activeCollectionId={activeCollectionId} totalCount={totalCount} />
           </div>
         </aside>
 
@@ -184,15 +200,13 @@ export default function PageContent({
           />
         </main>
 
-        {/* Right resize handle — only when the details panel is open */}
-        {(selectedIds.size > 0 || activeRoot !== null || suggestions.length > 0) && (
-          <div
-            onMouseDown={right.onMouseDown}
-            className="w-1 shrink-0 cursor-col-resize hover:bg-violet-400 dark:hover:bg-violet-500 transition-colors"
-          />
-        )}
+        {/* Right resize handle — the details panel is always open ("All" or a folder) */}
+        <div
+          onMouseDown={right.onMouseDown}
+          className="w-1 shrink-0 cursor-col-resize hover:bg-violet-400 dark:hover:bg-violet-500 transition-colors"
+        />
 
-        {/* Right details panel — folder info or image selection */}
+        {/* Right details panel — collection info, folder info, or image selection */}
         <DetailsPanel
           activeRoot={activeRoot}
           selectedIds={selectedIds}
@@ -200,6 +214,9 @@ export default function PageContent({
           vocabulary={vocabulary}
           suggestions={suggestions}
           onTagClick={handleTagClick}
+          collectionId={activeCollectionId}
+          collectionName={collectionName}
+          totalCount={totalCount}
           width={right.width}
         />
       </div>

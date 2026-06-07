@@ -224,6 +224,18 @@ export async function getImagesForRoot(rootId: number): Promise<{ id: number }[]
     .all(rootId) as { id: number }[];
 }
 
+/** Returns the IDs of all non-missing images in a collection, ordered by filename. */
+export async function getImagesForCollection(collectionId: number): Promise<{ id: number }[]> {
+  return getDb()
+    .prepare(
+      `SELECT i.id FROM images i
+       JOIN roots r ON r.id = i.root_id
+       WHERE r.collection_id = ? AND i.missing_at IS NULL
+       ORDER BY i.filename COLLATE NOCASE`,
+    )
+    .all(collectionId) as { id: number }[];
+}
+
 /**
  * Tags a single image and writes the result directly into image_tags (source 'ai').
  * Does NOT call revalidatePath — caller should router.refresh() after the full batch.

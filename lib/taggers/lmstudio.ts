@@ -5,7 +5,7 @@ const BASE_URL = (process.env.LMSTUDIO_BASE_URL ?? "http://127.0.0.1:1234").repl
 const MODEL = process.env.LMSTUDIO_MODEL ?? "local-model";
 
 interface OpenAIChatResponse {
-  choices?: Array<{ message?: { content?: string } }>;
+  choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
   error?: { message?: string };
 }
 
@@ -43,7 +43,6 @@ export class LMStudioTagger {
               ],
             },
           ],
-          max_tokens: 512,
           stream: false,
         }),
       });
@@ -62,7 +61,15 @@ export class LMStudioTagger {
 
     if (data.error?.message) throw new Error(`LM Studio model error: ${data.error.message}`);
 
-    const text = data.choices?.[0]?.message?.content ?? "";
+    const choice = data.choices?.[0];
+    if (choice?.finish_reason === "length") {
+      console.warn(
+        `[LMStudio] Response was cut off. ` +
+        `If using a reasoning model, increase max tokens.`,
+      );
+    }
+
+    const text = choice?.message?.content ?? "";
 
     try {
       const match = text.match(/\[[\s\S]*\]/);

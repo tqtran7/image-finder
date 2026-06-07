@@ -92,6 +92,16 @@ function migrate(db: DB): void {
     CREATE INDEX IF NOT EXISTS idx_images_hash      ON images(content_hash);
     CREATE INDEX IF NOT EXISTS idx_tags_name        ON tags(name);
     CREATE INDEX IF NOT EXISTS idx_suggestions_img  ON tag_suggestions(image_id);
+  `);
+
+  // ── tag_suggestions unique index (dedupe existing rows first) ──────────────
+  // Older DBs may hold duplicate (image_id, name) rows from before this index
+  // existed; creating the unique index would fail until they're removed.
+  db.exec(`
+    DELETE FROM tag_suggestions
+    WHERE id NOT IN (
+      SELECT MIN(id) FROM tag_suggestions GROUP BY image_id, name
+    );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_suggestions_unique ON tag_suggestions(image_id, name);
   `);
 
