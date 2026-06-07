@@ -33,6 +33,7 @@ export function useAutoTagBatch() {
 
   const pausedRef = useRef(false);
   const stoppedRef = useRef(false);
+  const runIdRef = useRef(0);
   const lastRunRef = useRef<{ fetchIds: FetchIds; filter: AutoTagFilter } | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
@@ -60,6 +61,7 @@ export function useAutoTagBatch() {
       lastRunRef.current = { fetchIds, filter };
       pausedRef.current = false;
       stoppedRef.current = false;
+      const myRunId = ++runIdRef.current;
       setSummary(null);
 
       const imgs = await fetchIds(filter);
@@ -79,19 +81,23 @@ export function useAutoTagBatch() {
       let processed = 0;
 
       for (const img of imgs) {
-        if (stoppedRef.current) break;
+        // Bail if this run was superseded by a stop (pause/stop bump runIdRef
+        // and update the UI optimistically — don't clobber that state here).
+        if (runIdRef.current !== myRunId || stoppedRef.current) break;
         if (pausedRef.current) {
-          setStatus("paused");
-          await releaseWakeLock();
+          // pause() already flipped the UI to "paused" and released the lock.
           return;
         }
 
         const result = await autoTagAndAcceptImage(img.id);
+        if (runIdRef.current !== myRunId) return;
         processed++;
         if (result.tagged) tagged++;
         if (result.error) errors++;
         setProgress({ done: processed, total: imgs.length, errors });
       }
+
+      if (runIdRef.current !== myRunId) return;
 
       await releaseWakeLock();
       setProgress(null);
@@ -113,7 +119,12 @@ export function useAutoTagBatch() {
 
   const pause = useCallback(() => {
     pausedRef.current = true;
-  }, []);
+    // Flip the UI immediately — don't wait for the in-flight image to finish.
+    // The in-flight call still completes server-side; its result is discarded
+    // via the run-id guard. Resume re-fetches from the DB, so nothing is lost.
+    setStatus("paused");
+    void releaseWakeLock();
+  }, [releaseWakeLock]);
 
   const resume = useCallback(() => {
     const last = lastRunRef.current;
@@ -123,15 +134,15 @@ export function useAutoTagBatch() {
   const stop = useCallback(() => {
     stoppedRef.current = true;
     pausedRef.current = false;
-    // If currently paused, the loop isn't running to observe the flag — finalize here.
-    if (status === "paused") {
-      setStatus("idle");
-      setProgress(null);
-      setSummary("Stopped.");
-      void releaseWakeLock();
-      router.refresh();
-    }
-  }, [status, releaseWakeLock, router]);
+    // Supersede the active run so any in-flight iteration's post-await writes
+    // are ignored, then finalize the UI immediately regardless of run state.
+    runIdRef.current++;
+    setStatus("idle");
+    setProgress(null);
+    setSummary("Stopped.");
+    void releaseWakeLock();
+    router.refresh();
+  }, [releaseWakeLock, router]);
 
   return { status, progress, summary, start, pause, resume, stop };
 }
