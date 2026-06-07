@@ -166,7 +166,14 @@ export default function PageContent({
             <h2 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
               Collection folders
             </h2>
-            <FolderListPanel roots={roots} activeCollectionId={activeCollectionId} totalCount={totalCount} totalTaggedCount={totalTaggedCount} />
+            <FolderListPanel
+              roots={roots}
+              activeCollectionId={activeCollectionId}
+              totalCount={totalCount}
+              totalTaggedCount={totalTaggedCount}
+              activeCollection={collections.find((c) => c.id === activeCollectionId) ?? null}
+              onEditCollection={setEditingCollection}
+            />
           </div>
         </aside>
 
