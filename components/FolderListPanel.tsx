@@ -9,10 +9,12 @@ export default function FolderListPanel({
   roots,
   activeCollectionId,
   totalCount,
+  totalTaggedCount,
 }: {
   roots: RootWithCount[];
   activeCollectionId: number;
   totalCount: number;
+  totalTaggedCount: number;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -57,7 +59,7 @@ export default function FolderListPanel({
               All
             </p>
             <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-full">
-              {totalCount.toLocaleString()}
+              {totalTaggedCount.toLocaleString()}/{totalCount.toLocaleString()}
             </span>
           </div>
         </li>
@@ -84,7 +86,7 @@ export default function FolderListPanel({
                 {root.label}
               </p>
               <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-full">
-                {root.image_count.toLocaleString()}
+                {root.tagged_count.toLocaleString()}/{root.image_count.toLocaleString()}
               </span>
             </div>
           </li>

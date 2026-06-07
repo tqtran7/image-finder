@@ -11,6 +11,7 @@ export interface RootWithCount {
   added_at: number | null;
   last_scanned_at: number | null;
   image_count: number;
+  tagged_count: number;
 }
 
 export default async function Home({
@@ -37,7 +38,8 @@ export default async function Home({
   const roots = db
     .prepare(
       `SELECT r.id, r.path, r.label, r.added_at, r.last_scanned_at,
-              COUNT(CASE WHEN i.missing_at IS NULL THEN 1 END) AS image_count
+              COUNT(CASE WHEN i.missing_at IS NULL THEN 1 END) AS image_count,
+              COUNT(CASE WHEN i.missing_at IS NULL AND EXISTS (SELECT 1 FROM image_tags it WHERE it.image_id = i.id) THEN 1 END) AS tagged_count
        FROM roots r
        LEFT JOIN images i ON i.root_id = r.id
        WHERE r.collection_id = ?
@@ -60,15 +62,15 @@ export default async function Home({
       .all(activeCollectionId) as { name: string }[]
   ).map((r) => r.name);
 
-  const totalCount = (
-    db
-      .prepare(
-        `SELECT COUNT(*) AS n FROM images i
-         JOIN roots r ON r.id = i.root_id
-         WHERE i.missing_at IS NULL AND r.collection_id = ?`,
-      )
-      .get(activeCollectionId) as { n: number }
-  ).n;
+  const { totalCount, totalTaggedCount } = db
+    .prepare(
+      `SELECT COUNT(*) AS totalCount,
+              COUNT(CASE WHEN EXISTS (SELECT 1 FROM image_tags it WHERE it.image_id = i.id) THEN 1 END) AS totalTaggedCount
+       FROM images i
+       JOIN roots r ON r.id = i.root_id
+       WHERE i.missing_at IS NULL AND r.collection_id = ?`,
+    )
+    .get(activeCollectionId) as { totalCount: number; totalTaggedCount: number };
 
   const filters = parseFilters(params);
   // Always scope the image query to the active collection
@@ -101,6 +103,7 @@ export default async function Home({
       images={images}
       vocabulary={vocabulary}
       totalCount={totalCount}
+      totalTaggedCount={totalTaggedCount}
       suggestions={suggestions}
       collections={collections}
       activeCollectionId={activeCollectionId}

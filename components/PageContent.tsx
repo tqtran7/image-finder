@@ -63,6 +63,7 @@ interface PageContentProps {
   images: ImageItem[];
   vocabulary: string[];
   totalCount: number;
+  totalTaggedCount: number;
   suggestions: FileDetailGroup[];
   collections: CollectionItem[];
   activeCollectionId: number;
@@ -73,6 +74,7 @@ export default function PageContent({
   images,
   vocabulary,
   totalCount,
+  totalTaggedCount,
   suggestions,
   collections,
   activeCollectionId,
@@ -164,7 +166,7 @@ export default function PageContent({
             <h2 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
               Collection folders
             </h2>
-            <FolderListPanel roots={roots} activeCollectionId={activeCollectionId} totalCount={totalCount} />
+            <FolderListPanel roots={roots} activeCollectionId={activeCollectionId} totalCount={totalCount} totalTaggedCount={totalTaggedCount} />
           </div>
         </aside>
 
