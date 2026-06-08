@@ -1,7 +1,7 @@
 export { DEFAULT_TAG_PROMPT } from "@/lib/taggers/prompts";
 
 export interface Tagger {
-  tag(absPath: string, ext: string, prompt?: string): Promise<string[]>;
+  tag(absPath: string, ext: string, prompt?: string, invert?: boolean, addBlackBackground?: boolean): Promise<string[]>;
 }
 
 /** The model name recorded alongside auto-generated tags/suggestions. */

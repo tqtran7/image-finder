@@ -10,22 +10,34 @@ interface OllamaChatResponse {
 }
 
 export class OllamaTagger {
-  async tag(absPath: string, ext: string, prompt?: string): Promise<string[]> {
+  async tag(absPath: string, ext: string, prompt?: string, invert = false, addBlackBackground = false): Promise<string[]> {
     const effectivePrompt = prompt?.trim() || DEFAULT_TAG_PROMPT;
-    let imageBase64: string;
+    let imageBytes: Buffer;
 
     if (ext === "svg") {
       // Rasterize SVG → PNG (Ollama vision models don't accept raw SVG)
       const { Resvg } = await import("@resvg/resvg-js");
       const svgText = readFileSync(absPath, "utf-8");
       const resvg = new Resvg(svgText, { fitTo: { mode: "width", value: 256 } });
-      imageBase64 = Buffer.from(resvg.render().asPng()).toString("base64");
+      imageBytes = Buffer.from(resvg.render().asPng());
     } else if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) {
-      imageBase64 = readFileSync(absPath).toString("base64");
+      imageBytes = readFileSync(absPath);
     } else {
       // ico, bmp, avif — not reliably supported; skip
       return [];
     }
+
+    if (addBlackBackground) {
+      const { flattenToBlack } = await import("@/lib/taggers/invert");
+      imageBytes = await flattenToBlack(imageBytes);
+    }
+
+    if (invert) {
+      const { invertImage } = await import("@/lib/taggers/invert");
+      imageBytes = await invertImage(imageBytes);
+    }
+
+    const imageBase64 = imageBytes.toString("base64");
 
     let response: Response;
     try {

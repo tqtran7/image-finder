@@ -89,7 +89,7 @@ export function useAutoTagBatch() {
           return;
         }
 
-        const result = await autoTagAndAcceptImage(img.id);
+        const result = await autoTagAndAcceptImage(img.id, filter.invert, filter.addBlackBackground);
         if (runIdRef.current !== myRunId) return;
         processed++;
         if (result.tagged) tagged++;

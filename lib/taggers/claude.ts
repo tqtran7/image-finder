@@ -15,9 +15,9 @@ const RASTER_MIME: Record<string, "image/png" | "image/jpeg" | "image/gif" | "im
 export class ClaudeTagger {
   private client = new Anthropic();
 
-  async tag(absPath: string, ext: string, prompt?: string): Promise<string[]> {
+  async tag(absPath: string, ext: string, prompt?: string, invert = false, addBlackBackground = false): Promise<string[]> {
     const effectivePrompt = prompt?.trim() || DEFAULT_TAG_PROMPT;
-    let imageBase64: string;
+    let imageBytes: Buffer;
     let mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
 
     if (ext === "svg") {
@@ -25,15 +25,30 @@ export class ClaudeTagger {
       const { Resvg } = await import("@resvg/resvg-js");
       const svgText = readFileSync(absPath, "utf-8");
       const resvg = new Resvg(svgText, { fitTo: { mode: "width", value: 256 } });
-      imageBase64 = Buffer.from(resvg.render().asPng()).toString("base64");
+      imageBytes = Buffer.from(resvg.render().asPng());
       mediaType = "image/png";
     } else if (RASTER_MIME[ext]) {
-      imageBase64 = readFileSync(absPath).toString("base64");
+      imageBytes = readFileSync(absPath);
       mediaType = RASTER_MIME[ext];
     } else {
       // ico, bmp, avif — not supported by Claude vision; skip
       return [];
     }
+
+    if (addBlackBackground) {
+      const { flattenToBlack } = await import("@/lib/taggers/invert");
+      imageBytes = await flattenToBlack(imageBytes);
+      mediaType = "image/png";
+    }
+
+    if (invert) {
+      // sharp re-encodes to PNG, so the media type must follow suit.
+      const { invertImage } = await import("@/lib/taggers/invert");
+      imageBytes = await invertImage(imageBytes);
+      mediaType = "image/png";
+    }
+
+    const imageBase64 = imageBytes.toString("base64");
 
     const response = await this.client.messages.create({
       model: MODEL,

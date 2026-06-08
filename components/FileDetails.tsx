@@ -1,8 +1,10 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import TagEditor from "@/components/TagEditor";
+import AutoTagModal from "@/components/AutoTagModal";
 import { removeTag, autoTagImages, clearGeneratedTags } from "@/lib/actions";
+import type { AutoTagFilter } from "@/lib/actions";
 import type { ImageItem } from "@/components/IconCard";
 
 interface FileDetailsProps {
@@ -21,6 +23,13 @@ export default function FileDetails({
   const [isPending, startTransition] = useTransition();
   const [isAutoTagging, startAutoTag] = useTransition();
   const [isClearing, startClear] = useTransition();
+  const [showAutoTagModal, setShowAutoTagModal] = useState(false);
+
+  function handleAutoTagConfirm(filter: AutoTagFilter) {
+    startAutoTag(async () => {
+      await autoTagImages(Array.from(selectedIds), filter.invert, filter.addBlackBackground);
+    });
+  }
 
   const selectedList = images.filter((img) => selectedIds.has(img.id));
   const count = selectedList.length;
@@ -53,11 +62,7 @@ export default function FileDetails({
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => {
-              startAutoTag(async () => {
-                await autoTagImages(Array.from(selectedIds));
-              });
-            }}
+            onClick={() => setShowAutoTagModal(true)}
             disabled={isAutoTagging || count === 0}
             title="Auto-tag with AI"
             className="text-xs px-2 py-0.5 rounded-md
@@ -112,6 +117,16 @@ export default function FileDetails({
         <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2">
           Saving…
         </p>
+      )}
+
+      {showAutoTagModal && (
+        <AutoTagModal
+          title={`Auto-tag ${count} ${count === 1 ? "image" : "images"}`}
+          description="Suggestions are added for review — existing tags are not changed."
+          onConfirm={handleAutoTagConfirm}
+          onClose={() => setShowAutoTagModal(false)}
+          showSkipOptions={false}
+        />
       )}
     </div>
   );

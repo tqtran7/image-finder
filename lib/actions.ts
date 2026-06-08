@@ -181,7 +181,7 @@ export async function removeTag(imageId: number, tagName: string) {
 
 // ── AI auto-tagging ────────────────────────────────────────────────────────
 
-export async function autoTagImages(imageIds: number[]) {
+export async function autoTagImages(imageIds: number[], invert = false, addBlackBackground = false) {
   console.log(`[autoTag] invoked with ${imageIds.length} ids:`, imageIds);
   console.log(`[autoTag] ANTHROPIC_API_KEY present:`, !!process.env.ANTHROPIC_API_KEY);
   const db = getDb();
@@ -209,7 +209,7 @@ export async function autoTagImages(imageIds: number[]) {
   for (const img of images) {
     let tags: string[];
     try {
-      tags = await tagger.tag(img.abs_path, img.ext, img.collection_prompt ?? undefined);
+      tags = await tagger.tag(img.abs_path, img.ext, img.collection_prompt ?? undefined, invert, addBlackBackground);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[autoTag] ${img.abs_path} failed:`, msg);
@@ -240,6 +240,18 @@ export interface AutoTagFilter {
   retagIfDifferentModel: boolean;
   /** When skipping, still re-tag images tagged longer ago than this many days. */
   retagOlderThanDays: number | null;
+  /**
+   * Tagging-time option (not a selection predicate): invert image colors before
+   * sending to the vision model, so white/light artwork on a transparent background
+   * is visible. Ignored by buildTagFilterClause.
+   */
+  invert: boolean;
+  /**
+   * Tagging-time option: composite the image onto a solid black background before
+   * sending to the vision model. Removes transparency so white/light artwork on a
+   * transparent background shows up clearly. Ignored by buildTagFilterClause.
+   */
+  addBlackBackground: boolean;
 }
 
 /**
@@ -306,6 +318,8 @@ export async function getImagesForCollection(
  */
 export async function autoTagAndAcceptImage(
   imageId: number,
+  invert = false,
+  addBlackBackground = false,
 ): Promise<{ tagged: boolean; error?: string }> {
   const db = getDb();
   const tagger = getTagger();
@@ -330,7 +344,7 @@ export async function autoTagAndAcceptImage(
 
   let tags: string[];
   try {
-    tags = await tagger.tag(img.abs_path, img.ext, img.collection_prompt ?? undefined);
+    tags = await tagger.tag(img.abs_path, img.ext, img.collection_prompt ?? undefined, invert, addBlackBackground);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return { tagged: false, error: msg };

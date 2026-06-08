@@ -10,22 +10,37 @@ interface OpenAIChatResponse {
 }
 
 export class LMStudioTagger {
-  async tag(absPath: string, ext: string, prompt?: string): Promise<string[]> {
+  async tag(absPath: string, ext: string, prompt?: string, invert = false, addBlackBackground = false): Promise<string[]> {
     const effectivePrompt = prompt?.trim() || DEFAULT_TAG_PROMPT;
-    let imageBase64: string;
+    let imageBytes: Buffer;
 
     if (ext === "svg") {
       const { Resvg } = await import("@resvg/resvg-js");
       const svgText = readFileSync(absPath, "utf-8");
       const resvg = new Resvg(svgText, { fitTo: { mode: "width", value: 256 } });
-      imageBase64 = Buffer.from(resvg.render().asPng()).toString("base64");
+      imageBytes = Buffer.from(resvg.render().asPng());
     } else if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) {
-      imageBase64 = readFileSync(absPath).toString("base64");
+      imageBytes = readFileSync(absPath);
     } else {
       return [];
     }
 
-    const mimeType = ext === "svg" || ext === "png" ? "image/png" : ext === "gif" ? "image/gif" : ext === "webp" ? "image/webp" : "image/jpeg";
+    // sharp re-encodes to PNG, so the mime type must follow suit when inverting.
+    let mimeType = ext === "svg" || ext === "png" ? "image/png" : ext === "gif" ? "image/gif" : ext === "webp" ? "image/webp" : "image/jpeg";
+
+    if (addBlackBackground) {
+      const { flattenToBlack } = await import("@/lib/taggers/invert");
+      imageBytes = await flattenToBlack(imageBytes);
+      mimeType = "image/png";
+    }
+
+    if (invert) {
+      const { invertImage } = await import("@/lib/taggers/invert");
+      imageBytes = await invertImage(imageBytes);
+      mimeType = "image/png";
+    }
+
+    const imageBase64 = imageBytes.toString("base64");
 
     let response: Response;
     try {
