@@ -23,7 +23,7 @@ export default async function Home({
   const params = await searchParams;
 
   const collections = db
-    .prepare("SELECT id, name, prompt FROM collections ORDER BY id ASC")
+    .prepare("SELECT id, name, prompt FROM collections ORDER BY sort_order ASC, id ASC")
     .all() as CollectionItem[];
 
   const rawCollectionParam = params["collection"];
@@ -44,7 +44,7 @@ export default async function Home({
        LEFT JOIN images i ON i.root_id = r.id
        WHERE r.collection_id = ?
        GROUP BY r.id
-       ORDER BY r.added_at DESC`,
+       ORDER BY r.sort_order ASC, r.added_at DESC`,
     )
     .all(activeCollectionId) as RootWithCount[];
 

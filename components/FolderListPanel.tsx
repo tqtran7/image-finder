@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import FolderPicker from "@/components/FolderPicker";
+import { reorderRoots } from "@/lib/actions";
 import type { RootWithCount } from "@/app/page";
 
 export default function FolderListPanel({
@@ -20,6 +21,33 @@ export default function FolderListPanel({
   const searchParams = useSearchParams();
   const activeRootId = searchParams.get("root") ? Number(searchParams.get("root")) : null;
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  // Local copy so drag reorders render optimistically; re-sync when props change.
+  const [items, setItems] = useState(roots);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+  const [, startReorder] = useTransition();
+  // Sync from props during render when the server order changes.
+  const [prevRoots, setPrevRoots] = useState(roots);
+  if (roots !== prevRoots) {
+    setPrevRoots(roots);
+    setItems(roots);
+  }
+
+  function handleDrop(targetIndex: number) {
+    if (dragIndex === null || dragIndex === targetIndex) {
+      setDragIndex(null);
+      setOverIndex(null);
+      return;
+    }
+    const next = [...items];
+    const [moved] = next.splice(dragIndex, 1);
+    next.splice(targetIndex, 0, moved);
+    setItems(next);
+    setDragIndex(null);
+    setOverIndex(null);
+    startReorder(() => reorderRoots(activeCollectionId, next.map((r) => r.id)));
+  }
 
   function handleAllClick() {
     const p = new URLSearchParams(searchParams.toString());
@@ -64,12 +92,29 @@ export default function FolderListPanel({
           </div>
         </li>
 
-        {roots.map((root) => (
+        {items.map((root, i) => (
           <li key={root.id}>
             <div
+              draggable
+              onDragStart={() => setDragIndex(i)}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (overIndex !== i) setOverIndex(i);
+              }}
+              onDrop={() => handleDrop(i)}
+              onDragEnd={() => {
+                setDragIndex(null);
+                setOverIndex(null);
+              }}
               onClick={() => handleFolderClick(root.id)}
               className={`rounded-lg border px-3 py-1.5 flex items-center gap-2
                           cursor-pointer transition-colors
+                          ${dragIndex === i ? "opacity-50" : ""}
+                          ${
+                            overIndex === i && dragIndex !== null && dragIndex !== i
+                              ? "ring-1 ring-blue-400 dark:ring-blue-500"
+                              : ""
+                          }
                           ${
                             activeRootId === root.id
                               ? "border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20"
@@ -99,7 +144,7 @@ export default function FolderListPanel({
         ))}
       </ul>
 
-      {roots.length === 0 && (
+      {items.length === 0 && (
         <p className="text-xs text-zinc-400 dark:text-zinc-500 pb-2">
           No folders added yet.
         </p>

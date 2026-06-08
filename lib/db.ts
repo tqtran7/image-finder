@@ -120,6 +120,34 @@ function migrate(db: DB): void {
     "CREATE INDEX IF NOT EXISTS idx_roots_collection ON roots(collection_id)",
   );
 
+  // ── collections.sort_order (added incrementally) ───────────────────────────
+  const collectionCols = db.prepare("PRAGMA table_info(collections)").all() as {
+    name: string;
+  }[];
+  if (!collectionCols.some((c) => c.name === "sort_order")) {
+    db.exec("ALTER TABLE collections ADD COLUMN sort_order INTEGER");
+    // Backfill in current display order (ORDER BY id ASC).
+    db.exec("UPDATE collections SET sort_order = id WHERE sort_order IS NULL");
+  }
+
+  // ── roots.sort_order (added incrementally) ─────────────────────────────────
+  // Backfill per collection so each collection's folders get a contiguous
+  // sequence matching today's display order (added_at DESC).
+  const rootSortCols = db.prepare("PRAGMA table_info(roots)").all() as {
+    name: string;
+  }[];
+  if (!rootSortCols.some((c) => c.name === "sort_order")) {
+    db.exec("ALTER TABLE roots ADD COLUMN sort_order INTEGER");
+    db.exec(`
+      UPDATE roots SET sort_order = (
+        SELECT COUNT(*) FROM roots r2
+        WHERE r2.collection_id IS roots.collection_id
+          AND (r2.added_at > roots.added_at
+               OR (r2.added_at = roots.added_at AND r2.id < roots.id))
+      ) WHERE sort_order IS NULL;
+    `);
+  }
+
   // ── images.tagged_at / images.tagger_model (added incrementally) ───────────
   // Track when an image was last auto-tagged and by which model, so batch runs
   // can skip already-tagged images and apply re-tag rules (different model / age).

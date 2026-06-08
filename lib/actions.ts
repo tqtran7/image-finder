@@ -11,13 +11,25 @@ import { getTagger, getTaggerModel } from "@/lib/taggers";
 
 export async function createCollection(name: string): Promise<number> {
   const db = getDb();
+  const nextOrder = (
+    db
+      .prepare("SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM collections")
+      .get() as { n: number }
+  ).n;
   const result = db
     .prepare(
-      "INSERT INTO collections (name, prompt, created_at) VALUES (?, NULL, ?) RETURNING id",
+      "INSERT INTO collections (name, prompt, created_at, sort_order) VALUES (?, NULL, ?, ?) RETURNING id",
     )
-    .get(name.trim(), Date.now()) as { id: number };
+    .get(name.trim(), Date.now(), nextOrder) as { id: number };
   revalidatePath("/");
   return result.id;
+}
+
+export async function reorderCollections(orderedIds: number[]) {
+  const db = getDb();
+  const upd = db.prepare("UPDATE collections SET sort_order = ? WHERE id = ?");
+  db.transaction(() => orderedIds.forEach((id, i) => upd.run(i, id)))();
+  revalidatePath("/");
 }
 
 export async function renameCollection(id: number, name: string) {
@@ -69,14 +81,22 @@ export async function addRoot(absPath: string, collectionId: number, label?: str
   const db = getDb();
   const now = Date.now();
 
+  const nextOrder = (
+    db
+      .prepare(
+        "SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM roots WHERE collection_id = ?",
+      )
+      .get(collectionId) as { n: number }
+  ).n;
+
   const result = db
     .prepare(
-      `INSERT INTO roots (path, label, added_at, collection_id)
-       VALUES (?, ?, ?, ?)
+      `INSERT INTO roots (path, label, added_at, collection_id, sort_order)
+       VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(path) DO UPDATE SET label = excluded.label, collection_id = excluded.collection_id
        RETURNING id`,
     )
-    .get(resolved, label ?? path.basename(resolved), now, collectionId) as
+    .get(resolved, label ?? path.basename(resolved), now, collectionId, nextOrder) as
     | { id: number }
     | undefined;
 
@@ -96,9 +116,26 @@ export async function removeRoot(id: number) {
 }
 
 export async function moveRootToCollection(rootId: number, targetCollectionId: number) {
-  getDb()
-    .prepare("UPDATE roots SET collection_id = ? WHERE id = ?")
-    .run(targetCollectionId, rootId);
+  const db = getDb();
+  const nextOrder = (
+    db
+      .prepare(
+        "SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM roots WHERE collection_id = ?",
+      )
+      .get(targetCollectionId) as { n: number }
+  ).n;
+  db.prepare(
+    "UPDATE roots SET collection_id = ?, sort_order = ? WHERE id = ?",
+  ).run(targetCollectionId, nextOrder, rootId);
+  revalidatePath("/");
+}
+
+export async function reorderRoots(collectionId: number, orderedIds: number[]) {
+  const db = getDb();
+  const upd = db.prepare(
+    "UPDATE roots SET sort_order = ? WHERE id = ? AND collection_id = ?",
+  );
+  db.transaction(() => orderedIds.forEach((id, i) => upd.run(i, id, collectionId)))();
   revalidatePath("/");
 }
 

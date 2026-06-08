@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition, useState } from "react";
-import { createCollection } from "@/lib/actions";
+import { createCollection, reorderCollections } from "@/lib/actions";
 
 export interface CollectionItem {
   id: number;
@@ -24,8 +24,37 @@ export default function CollectionSwitcher({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isCreating, startCreate] = useTransition();
+  const [, startReorder] = useTransition();
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+
+  // Local copy so drag reorders render optimistically; re-sync when props change
+  // (after revalidation persists the new order).
+  const [items, setItems] = useState(collections);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+  // Sync from props during render when the server order changes (the React
+  // "adjusting state when a prop changes" pattern).
+  const [prevCollections, setPrevCollections] = useState(collections);
+  if (collections !== prevCollections) {
+    setPrevCollections(collections);
+    setItems(collections);
+  }
+
+  function handleDrop(targetIndex: number) {
+    if (dragIndex === null || dragIndex === targetIndex) {
+      setDragIndex(null);
+      setOverIndex(null);
+      return;
+    }
+    const next = [...items];
+    const [moved] = next.splice(dragIndex, 1);
+    next.splice(targetIndex, 0, moved);
+    setItems(next);
+    setDragIndex(null);
+    setOverIndex(null);
+    startReorder(() => reorderCollections(next.map((c) => c.id)));
+  }
 
   function switchTo(id: number) {
     const p = new URLSearchParams(searchParams.toString());
@@ -72,11 +101,28 @@ export default function CollectionSwitcher({
 
       {/* Collection tabs */}
       <div className="flex flex-col gap-1 mb-2">
-        {collections.map((c) => (
+        {items.map((c, i) => (
           <button
             key={c.id}
+            draggable
+            onDragStart={() => setDragIndex(i)}
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (overIndex !== i) setOverIndex(i);
+            }}
+            onDrop={() => handleDrop(i)}
+            onDragEnd={() => {
+              setDragIndex(null);
+              setOverIndex(null);
+            }}
             onClick={() => switchTo(c.id)}
             className={`text-left text-xs px-2.5 py-1.5 rounded-md truncate transition-colors ${
+              dragIndex === i ? "opacity-50" : ""
+            } ${
+              overIndex === i && dragIndex !== null && dragIndex !== i
+                ? "ring-1 ring-blue-400 dark:ring-blue-500"
+                : ""
+            } ${
               c.id === activeCollectionId
                 ? "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium"
                 : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700"
