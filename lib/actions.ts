@@ -95,6 +95,13 @@ export async function removeRoot(id: number) {
   revalidatePath("/");
 }
 
+export async function moveRootToCollection(rootId: number, targetCollectionId: number) {
+  getDb()
+    .prepare("UPDATE roots SET collection_id = ? WHERE id = ?")
+    .run(targetCollectionId, rootId);
+  revalidatePath("/");
+}
+
 // ── Tags ───────────────────────────────────────────────────────────────────
 
 export async function addTags(imageIds: number[], tagNames: string[]) {

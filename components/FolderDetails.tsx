@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   removeRoot,
   rescanRoot,
   getImagesForRoot,
   clearTagsForRoot,
+  moveRootToCollection,
 } from "@/lib/actions";
 import { useAutoTagBatch } from "@/components/useAutoTagBatch";
 import AutoTagModal from "@/components/AutoTagModal";
+import MoveRootModal from "@/components/MoveRootModal";
 import CollectionPromptPreview from "@/components/CollectionPromptPreview";
 import type { AutoTagFilter } from "@/lib/actions";
 import type { RootWithCount } from "@/app/page";
@@ -18,16 +20,20 @@ import type { CollectionItem } from "@/components/CollectionSwitcher";
 export default function FolderDetails({
   root,
   activeCollection,
+  collections,
   onEditCollection,
 }: {
   root: RootWithCount;
   activeCollection: CollectionItem | null;
+  collections: CollectionItem[];
   onEditCollection: (collection: CollectionItem) => void;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
   const [scanningId, setScanningId] = useState<number | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [showMoveModal, setShowMoveModal] = useState(false);
   const { status, progress, summary, start, pause, resume, stop } = useAutoTagBatch();
   const [confirmAction, setConfirmAction] = useState<"remove" | "clear" | null>(null);
   const [copied, setCopied] = useState(false);
@@ -67,6 +73,17 @@ export default function FolderDetails({
     setConfirmAction(null);
     startTransition(async () => {
       await removeRoot(root.id);
+    });
+  }
+
+  function doMove(targetCollectionId: number) {
+    startTransition(async () => {
+      await moveRootToCollection(root.id, targetCollectionId);
+      const p = new URLSearchParams(searchParams.toString());
+      p.set("collection", String(targetCollectionId));
+      p.set("root", String(root.id));
+      p.delete("tags");
+      router.replace("?" + p.toString(), { scroll: false });
     });
   }
 
@@ -204,6 +221,16 @@ export default function FolderDetails({
           {scanningId === root.id ? "Scanning…" : "↻ Rescan folder"}
         </button>
         <button
+          onClick={() => setShowMoveModal(true)}
+          disabled={pending || isTagging}
+          className="w-full text-left text-xs font-medium px-2 py-2 rounded-lg
+                     text-zinc-600 hover:bg-zinc-100
+                     dark:text-zinc-300 dark:hover:bg-zinc-800
+                     disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          ⇄ Move folder
+        </button>
+        <button
           onClick={() => setConfirmAction("remove")}
           disabled={pending || isTagging}
           className="w-full text-left text-xs font-medium px-2 py-2 rounded-lg
@@ -270,6 +297,16 @@ export default function FolderDetails({
           description={`${root.image_count.toLocaleString()} images — tags applied automatically without review.`}
           onConfirm={handleConfirm}
           onClose={() => setShowModal(false)}
+        />
+      )}
+
+      {showMoveModal && (
+        <MoveRootModal
+          rootLabel={root.label}
+          currentCollectionId={activeCollection?.id ?? null}
+          collections={collections}
+          onConfirm={doMove}
+          onClose={() => setShowMoveModal(false)}
         />
       )}
     </div>

@@ -225,6 +225,7 @@ export default function PageContent({
           collectionName={collectionName}
           totalCount={totalCount}
           activeCollection={collections.find((c) => c.id === activeCollectionId) ?? null}
+          collections={collections}
           onEditCollection={setEditingCollection}
           width={right.width}
         />

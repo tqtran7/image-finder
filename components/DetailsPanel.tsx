@@ -20,6 +20,7 @@ interface DetailsPanelProps {
   collectionName: string;
   totalCount: number;
   activeCollection: CollectionItem | null;
+  collections: CollectionItem[];
   onEditCollection: (collection: CollectionItem) => void;
   width?: number;
 }
@@ -35,6 +36,7 @@ export default function DetailsPanel({
   collectionName,
   totalCount,
   activeCollection,
+  collections,
   onEditCollection,
   width,
 }: DetailsPanelProps) {
@@ -63,6 +65,7 @@ export default function DetailsPanel({
         <FolderDetails
           root={activeRoot!}
           activeCollection={activeCollection}
+          collections={collections}
           onEditCollection={onEditCollection}
         />
       )}
