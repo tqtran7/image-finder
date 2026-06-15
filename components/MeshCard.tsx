@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { CARD_W, type ImageItem } from "@/components/IconCard";
-import MeshViewer from "@/components/MeshViewer";
 import { renderThumbnail } from "@/lib/three/thumbnailRenderer";
 
 function fileUrl(id: number) {
@@ -18,8 +17,6 @@ function fileUrl(id: number) {
 function MeshThumbnail({ image }: { image: ImageItem }) {
   const is3d = image.ext.toLowerCase() === "fbx";
   const [snapshot, setSnapshot] = useState<string | null>(null);
-  const [hovered, setHovered] = useState(false);
-
   useEffect(() => {
     if (!is3d) return;
     let active = true;
@@ -47,14 +44,8 @@ function MeshThumbnail({ image }: { image: ImageItem }) {
   }
 
   return (
-    <div
-      className="absolute inset-0"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      {hovered ? (
-        <MeshViewer url={fileUrl(image.id)} autoRotate />
-      ) : snapshot ? (
+    <div className="absolute inset-0">
+      {snapshot ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={snapshot}
