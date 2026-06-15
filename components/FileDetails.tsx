@@ -4,7 +4,8 @@ import { useState, useTransition } from "react";
 import TagEditor from "@/components/TagEditor";
 import AutoTagModal from "@/components/AutoTagModal";
 import MeshViewer from "@/components/MeshViewer";
-import { removeTag, autoTagImages, clearGeneratedTags } from "@/lib/actions";
+import { removeTag, autoTagImages, autoTagMeshSuggestions, clearGeneratedTags } from "@/lib/actions";
+import { renderMeshSnapshotsBase64 } from "@/lib/three/tagMesh";
 import type { AutoTagFilter } from "@/lib/actions";
 import type { ImageItem } from "@/components/IconCard";
 
@@ -23,8 +24,8 @@ export default function FileDetails({
   onTagClick,
   kind = "image",
 }: FileDetailsProps) {
-  // AI vision tagging can't read raw 3D files, so it's hidden for meshes (v1).
-  const showAutoTag = kind !== "mesh";
+  const isMesh = kind === "mesh";
+  const showAutoTag = true;
   const [isPending, startTransition] = useTransition();
   const [isAutoTagging, startAutoTag] = useTransition();
   const [isClearing, startClear] = useTransition();
@@ -32,7 +33,16 @@ export default function FileDetails({
 
   function handleAutoTagConfirm(filter: AutoTagFilter) {
     startAutoTag(async () => {
-      await autoTagImages(Array.from(selectedIds), filter.invert, filter.addBlackBackground);
+      if (isMesh) {
+        // Vision models can't read FBX — render each preview snapshot in the browser
+        // and tag that. Done sequentially so the shared thumbnail renderer isn't raced.
+        for (const id of selectedIds) {
+          const images = await renderMeshSnapshotsBase64(id, filter.meshAngles);
+          await autoTagMeshSuggestions(id, images, filter.invert, filter.addBlackBackground);
+        }
+      } else {
+        await autoTagImages(Array.from(selectedIds), filter.invert, filter.addBlackBackground);
+      }
     });
   }
 
@@ -97,7 +107,7 @@ export default function FileDetails({
 
       {/* Interactive 3D preview — only for a single selected mesh */}
       {kind === "mesh" && count === 1 && selectedList[0].ext.toLowerCase() === "fbx" && (
-        <div className="mb-3 aspect-square w-full overflow-hidden rounded-lg bg-zinc-200 dark:bg-zinc-700">
+        <div className="mb-3 aspect-square w-full overflow-hidden rounded-lg bg-zinc-900">
           <MeshViewer
             key={selectedList[0].id}
             url={`/api/file?id=${selectedList[0].id}`}
@@ -140,11 +150,12 @@ export default function FileDetails({
 
       {showAutoTagModal && (
         <AutoTagModal
-          title={`Auto-tag ${count} ${count === 1 ? "image" : "images"}`}
+          title={`Auto-tag ${count} ${isMesh ? (count === 1 ? "mesh" : "meshes") : count === 1 ? "image" : "images"}`}
           description="Suggestions are added for review — existing tags are not changed."
           onConfirm={handleAutoTagConfirm}
           onClose={() => setShowAutoTagModal(false)}
           showSkipOptions={false}
+          showAngleOptions={isMesh}
         />
       )}
     </div>

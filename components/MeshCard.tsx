@@ -111,7 +111,7 @@ export default function MeshCard({
       <div
         style={{ width: CARD_W, height: CARD_W }}
         className={`relative flex items-center justify-center rounded-lg overflow-hidden
-                    bg-zinc-200 dark:bg-zinc-700 transition-all
+                    bg-zinc-200 dark:bg-zinc-600 transition-all
                     ${selected ? "ring-2 ring-blue-500 ring-offset-1 ring-offset-zinc-50 dark:ring-offset-zinc-900" : ""}`}
       >
         <MeshThumbnail image={image} />

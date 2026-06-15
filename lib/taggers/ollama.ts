@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
-import { DEFAULT_TAG_PROMPT } from "@/lib/taggers/prompts";
+import { DEFAULT_TAG_PROMPT, parseTags } from "@/lib/taggers/prompts";
+import type { TagImage } from "@/lib/taggers";
 
 const BASE_URL = (process.env.OLLAMA_BASE_URL ?? "http://localhost:11434").replace(/\/$/, "");
 const MODEL = process.env.OLLAMA_MODEL ?? "llava";
@@ -11,7 +12,6 @@ interface OllamaChatResponse {
 
 export class OllamaTagger {
   async tag(absPath: string, ext: string, prompt?: string, invert = false, addBlackBackground = false): Promise<string[]> {
-    const effectivePrompt = prompt?.trim() || DEFAULT_TAG_PROMPT;
     let imageBytes: Buffer;
 
     if (ext === "svg") {
@@ -37,7 +37,12 @@ export class OllamaTagger {
       imageBytes = await invertImage(imageBytes);
     }
 
-    const imageBase64 = imageBytes.toString("base64");
+    // Ollama only needs the base64 bytes; the media type is irrelevant to it.
+    return this.tagImageBytes([{ bytes: imageBytes, mediaType: "image/png" }], prompt);
+  }
+
+  async tagImageBytes(images: TagImage[], prompt?: string): Promise<string[]> {
+    const effectivePrompt = prompt?.trim() || DEFAULT_TAG_PROMPT;
 
     let response: Response;
     try {
@@ -50,7 +55,7 @@ export class OllamaTagger {
             {
               role: "user",
               content: effectivePrompt,
-              images: [imageBase64],
+              images: images.map((img) => img.bytes.toString("base64")),
             },
           ],
           stream: false,
@@ -71,23 +76,6 @@ export class OllamaTagger {
 
     if (data.error) throw new Error(`Ollama model error: ${data.error}`);
 
-    const text = data.message?.content ?? "";
-
-    try {
-      const match = text.match(/\[[\s\S]*?\]/);
-      if (!match) return [];
-      const parsed = JSON.parse(match[0]);
-      if (!Array.isArray(parsed)) return [];
-      return [
-        ...new Set(
-          parsed
-            .filter((t): t is string => typeof t === "string")
-            .map((t) => t.toLowerCase().trim())
-            .filter(Boolean),
-        ),
-      ];
-    } catch {
-      return [];
-    }
+    return parseTags(data.message?.content ?? "");
   }
 }

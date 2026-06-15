@@ -17,6 +17,12 @@ export type BatchStatus = "idle" | "running" | "paused";
 /** Fetches the candidate image IDs for a run, given the chosen filter. */
 type FetchIds = (filter: AutoTagFilter) => Promise<{ id: number }[]>;
 
+/** Tags a single item. Defaults to the image path; meshes pass a snapshot-rendering variant. */
+type TagItem = (id: number, filter: AutoTagFilter) => Promise<{ tagged: boolean; error?: string }>;
+
+const defaultTagItem: TagItem = (id, filter) =>
+  autoTagAndAcceptImage(id, filter.invert, filter.addBlackBackground);
+
 /**
  * Drives a client-side, DB-resumable auto-tag batch.
  *
@@ -34,7 +40,7 @@ export function useAutoTagBatch() {
   const pausedRef = useRef(false);
   const stoppedRef = useRef(false);
   const runIdRef = useRef(0);
-  const lastRunRef = useRef<{ fetchIds: FetchIds; filter: AutoTagFilter } | null>(null);
+  const lastRunRef = useRef<{ fetchIds: FetchIds; filter: AutoTagFilter; tagItem: TagItem } | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
   const acquireWakeLock = useCallback(async () => {
@@ -57,8 +63,8 @@ export function useAutoTagBatch() {
   }, []);
 
   const runBatch = useCallback(
-    async (fetchIds: FetchIds, filter: AutoTagFilter) => {
-      lastRunRef.current = { fetchIds, filter };
+    async (fetchIds: FetchIds, filter: AutoTagFilter, tagItem: TagItem) => {
+      lastRunRef.current = { fetchIds, filter, tagItem };
       pausedRef.current = false;
       stoppedRef.current = false;
       const myRunId = ++runIdRef.current;
@@ -89,7 +95,7 @@ export function useAutoTagBatch() {
           return;
         }
 
-        const result = await autoTagAndAcceptImage(img.id, filter.invert, filter.addBlackBackground);
+        const result = await tagItem(img.id, filter);
         if (runIdRef.current !== myRunId) return;
         processed++;
         if (result.tagged) tagged++;
@@ -113,7 +119,8 @@ export function useAutoTagBatch() {
   );
 
   const start = useCallback(
-    (fetchIds: FetchIds, filter: AutoTagFilter) => runBatch(fetchIds, filter),
+    (fetchIds: FetchIds, filter: AutoTagFilter, tagItem: TagItem = defaultTagItem) =>
+      runBatch(fetchIds, filter, tagItem),
     [runBatch],
   );
 
@@ -128,7 +135,7 @@ export function useAutoTagBatch() {
 
   const resume = useCallback(() => {
     const last = lastRunRef.current;
-    if (last) void runBatch(last.fetchIds, last.filter);
+    if (last) void runBatch(last.fetchIds, last.filter, last.tagItem);
   }, [runBatch]);
 
   const stop = useCallback(() => {

@@ -8,23 +8,64 @@ export const DEFAULT_AUTOTAG_FILTER: AutoTagFilter = {
   retagOlderThanDays: null,
   invert: false,
   addBlackBackground: false,
+  meshAngles: 1,
 };
+
+const ANGLE_CHOICES: { value: number; label: string }[] = [
+  { value: 1, label: "Single" },
+  { value: 2, label: "2" },
+  { value: 4, label: "4" },
+  { value: 6, label: "6" },
+];
 
 export default function AutoTagOptions({
   value,
   onChange,
   disabled,
   showSkipOptions = true,
+  showAngleOptions = false,
 }: {
   value: AutoTagFilter;
   onChange: (next: AutoTagFilter) => void;
   disabled?: boolean;
   showSkipOptions?: boolean;
+  showAngleOptions?: boolean;
 }) {
   const set = (patch: Partial<AutoTagFilter>) => onChange({ ...value, ...patch });
 
   return (
     <div className="flex flex-col gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+      {showAngleOptions && (
+        <div className="flex flex-col gap-1">
+          <span className="font-medium text-zinc-700 dark:text-zinc-300">Angles per mesh</span>
+          <div className="flex gap-1">
+            {ANGLE_CHOICES.map((choice) => (
+              <button
+                key={choice.value}
+                type="button"
+                disabled={disabled}
+                onClick={() => set({ meshAngles: choice.value })}
+                className={`flex-1 rounded-md px-2 py-1 border ${
+                  value.meshAngles === choice.value
+                    ? "border-violet-500 bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300"
+                    : "border-zinc-300 dark:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                } disabled:opacity-40`}
+              >
+                {choice.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-0.5 text-[11px] leading-snug text-zinc-500 dark:text-zinc-500">
+            Renders the mesh from this many angles and sends them all to the model. More
+            angles capture hidden features but are slower and cost more per mesh.
+          </p>
+        </div>
+      )}
+
+      {showAngleOptions && showSkipOptions && (
+        <div className="border-t border-zinc-200 dark:border-zinc-700" />
+      )}
+
       {showSkipOptions && (
         <>
           <label className="flex items-center gap-2">

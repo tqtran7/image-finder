@@ -1,7 +1,18 @@
-export { DEFAULT_TAG_PROMPT } from "@/lib/taggers/prompts";
+export { DEFAULT_TAG_PROMPT, DEFAULT_MESH_TAG_PROMPT } from "@/lib/taggers/prompts";
+
+export interface TagImage {
+  bytes: Buffer;
+  /** MIME type of `bytes`, e.g. "image/png". */
+  mediaType: string;
+}
 
 export interface Tagger {
   tag(absPath: string, ext: string, prompt?: string, invert?: boolean, addBlackBackground?: boolean): Promise<string[]>;
+  /**
+   * Tags one or more already-decoded images in a single request (e.g. client-rendered
+   * mesh snapshots from several angles), skipping the disk read that {@link tag} performs.
+   */
+  tagImageBytes(images: TagImage[], prompt?: string): Promise<string[]>;
 }
 
 /** The model name recorded alongside auto-generated tags/suggestions. */

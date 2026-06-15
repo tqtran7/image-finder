@@ -1,7 +1,8 @@
 "use client";
 
-import { useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { acceptSuggestions, rejectSuggestions } from "@/lib/actions";
+import { renderThumbnail } from "@/lib/three/thumbnailRenderer";
 
 export interface FileDetailGroup {
   imageId: number;
@@ -30,6 +31,33 @@ export default function TagSuggestions({ groups }: FileDetailsProps) {
   );
 }
 
+/**
+ * Small preview for a suggestion row. FBX meshes can't be shown via /api/file (it
+ * serves the raw 3D file), so we render the cached three.js snapshot for those and
+ * fall back to a plain <img> for ordinary images.
+ */
+function SuggestionPreview({ imageId, filename }: { imageId: number; filename: string }) {
+  const isMesh = filename.toLowerCase().endsWith(".fbx");
+  const [snapshot, setSnapshot] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isMesh) return;
+    let active = true;
+    renderThumbnail(imageId, `/api/file?id=${imageId}`)
+      .then((url) => active && setSnapshot(url))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [isMesh, imageId]);
+
+  const className = "w-8 h-8 object-contain rounded bg-zinc-200 dark:bg-zinc-700 shrink-0";
+  const src = isMesh ? snapshot : `/api/file?id=${imageId}`;
+  if (!src) return <div className={className} />;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt={filename} className={className} />;
+}
+
 function FileDetailRow({ group }: { group: FileDetailGroup }) {
   const [isPending, startTransition] = useTransition();
 
@@ -49,12 +77,7 @@ function FileDetailRow({ group }: { group: FileDetailGroup }) {
     <div className={`rounded-lg border border-zinc-200 dark:border-zinc-600 p-2.5 ${isPending ? "opacity-50" : ""}`}>
       {/* Image preview + filename */}
       <div className="flex items-center gap-2 mb-2">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={`/api/file?id=${group.imageId}`}
-          alt={group.filename}
-          className="w-8 h-8 object-contain rounded bg-zinc-200 dark:bg-zinc-700 shrink-0"
-        />
+        <SuggestionPreview imageId={group.imageId} filename={group.filename} />
         <span className="text-xs text-zinc-600 dark:text-zinc-300 truncate min-w-0">
           {group.filename}
         </span>

@@ -5,7 +5,9 @@ import { statSync } from "node:fs";
 import path from "node:path";
 import { getDb } from "@/lib/db";
 import { scanRoot } from "@/lib/scan";
-import { getTagger, getTaggerModel } from "@/lib/taggers";
+import { getTagger, getTaggerModel, DEFAULT_MESH_TAG_PROMPT } from "@/lib/taggers";
+import { multiAngleNote } from "@/lib/taggers/prompts";
+import type { TagImage } from "@/lib/taggers";
 
 // ── Collections ────────────────────────────────────────────────────────────
 
@@ -299,6 +301,12 @@ export interface AutoTagFilter {
    * transparent background shows up clearly. Ignored by buildTagFilterClause.
    */
   addBlackBackground: boolean;
+  /**
+   * Mesh-only tagging-time option: how many camera angles to render and send per mesh
+   * (1 = single 3/4 view, the default; 2, 4, or 6). More angles improve tag quality at
+   * proportionally higher cost/latency. Ignored for images and by buildTagFilterClause.
+   */
+  meshAngles: number;
 }
 
 /**
@@ -463,4 +471,139 @@ export async function rejectSuggestions(imageId: number) {
     .prepare("UPDATE tag_suggestions SET status = 'rejected' WHERE image_id = ? AND status = 'pending'")
     .run(imageId);
   revalidatePath("/", "layout");
+}
+
+// ── AI auto-tagging for 3D meshes ────────────────────────────────────────────
+//
+// Vision models can't read raw FBX files, so the mesh's preview is rendered to a
+// PNG in the browser (lib/three/thumbnailRenderer) and the base64 image is passed
+// in here. These mirror autoTagImages / autoTagAndAcceptImage but tag the supplied
+// snapshot bytes instead of reading the file from disk.
+
+interface MeshRow {
+  id: number;
+  abs_path: string;
+  collection_prompt: string | null;
+}
+
+/** Runs the configured tagger over one or more client-rendered mesh snapshots (base64 PNGs). */
+async function tagMeshSnapshots(
+  collectionPrompt: string | null,
+  imagesBase64: string[],
+  invert: boolean,
+  addBlackBackground: boolean,
+): Promise<string[]> {
+  if (imagesBase64.length === 0) return [];
+
+  const maybeInvert = invert || addBlackBackground
+    ? await import("@/lib/taggers/invert")
+    : null;
+
+  const images: TagImage[] = [];
+  for (const b64 of imagesBase64) {
+    let bytes: Buffer = Buffer.from(b64, "base64");
+    if (addBlackBackground) bytes = await maybeInvert!.flattenToBlack(bytes);
+    if (invert) bytes = await maybeInvert!.invertImage(bytes);
+    images.push({ bytes, mediaType: "image/png" });
+  }
+
+  let prompt = collectionPrompt?.trim() || DEFAULT_MESH_TAG_PROMPT;
+  if (images.length > 1) prompt += multiAngleNote(images.length);
+  return getTagger().tagImageBytes(images, prompt);
+}
+
+function getMeshRow(imageId: number): MeshRow | undefined {
+  return getDb()
+    .prepare(
+      `SELECT i.id, i.abs_path, c.prompt AS collection_prompt
+       FROM images i
+       JOIN roots r ON r.id = i.root_id
+       JOIN collections c ON c.id = r.collection_id
+       WHERE i.id = ? AND i.missing_at IS NULL`,
+    )
+    .get(imageId) as MeshRow | undefined;
+}
+
+/** Tags one mesh's snapshots and stores the result as pending suggestions (for review). */
+export async function autoTagMeshSuggestions(
+  imageId: number,
+  imagesBase64: string[],
+  invert = false,
+  addBlackBackground = false,
+) {
+  const db = getDb();
+  const img = getMeshRow(imageId);
+  if (!img) return;
+
+  let tags: string[];
+  try {
+    tags = await tagMeshSnapshots(img.collection_prompt, imagesBase64, invert, addBlackBackground);
+  } catch (err) {
+    console.error(`[autoTagMesh] ${img.abs_path} failed:`, err instanceof Error ? err.message : err);
+    throw err;
+  }
+
+  const insert = db.prepare(
+    `INSERT OR IGNORE INTO tag_suggestions (image_id, name, model, created_at, status)
+     VALUES (?, lower(?), ?, ?, 'pending')`,
+  );
+  const now = Date.now();
+  db.transaction(() => {
+    for (const tag of tags) {
+      if (tag) insert.run(img.id, tag, getTaggerModel(), now);
+    }
+  })();
+
+  revalidatePath("/", "layout");
+}
+
+/**
+ * Tags one mesh snapshot and writes the result directly into image_tags (source 'ai').
+ * Does NOT call revalidatePath — the batch caller refreshes after the full run.
+ */
+export async function autoTagAndAcceptMesh(
+  imageId: number,
+  imagesBase64: string[],
+  invert = false,
+  addBlackBackground = false,
+): Promise<{ tagged: boolean; error?: string }> {
+  const db = getDb();
+  const now = Date.now();
+
+  const img = getMeshRow(imageId);
+  if (!img) return { tagged: false, error: "Mesh not found or missing" };
+
+  let tags: string[];
+  try {
+    tags = await tagMeshSnapshots(img.collection_prompt, imagesBase64, invert, addBlackBackground);
+  } catch (err) {
+    return { tagged: false, error: err instanceof Error ? err.message : String(err) };
+  }
+
+  const upsertTag = db.prepare(
+    `INSERT INTO tags (name) VALUES (lower(?))
+     ON CONFLICT(name) DO UPDATE SET name = name
+     RETURNING id`,
+  );
+  const insertImageTag = db.prepare(
+    `INSERT INTO image_tags (image_id, tag_id, source, created_at)
+     VALUES (?, ?, 'ai', ?)
+     ON CONFLICT(image_id, tag_id) DO NOTHING`,
+  );
+  const markTagged = db.prepare(
+    "UPDATE images SET tagged_at = ?, tagger_model = ? WHERE id = ?",
+  );
+
+  // Processed without error — stamp it (even with zero tags) so batch runs treat it
+  // as done and don't retry it forever.
+  db.transaction(() => {
+    for (const name of tags) {
+      if (!name) continue;
+      const tag = upsertTag.get(name) as { id: number } | undefined;
+      if (tag) insertImageTag.run(img.id, tag.id, now);
+    }
+    markTagged.run(now, getTaggerModel(), img.id);
+  })();
+
+  return { tagged: tags.length > 0 };
 }

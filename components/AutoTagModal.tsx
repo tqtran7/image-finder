@@ -10,12 +10,14 @@ export default function AutoTagModal({
   onConfirm,
   onClose,
   showSkipOptions = true,
+  showAngleOptions = false,
 }: {
   title: string;
   description: string;
   onConfirm: (filter: AutoTagFilter) => void;
   onClose: () => void;
   showSkipOptions?: boolean;
+  showAngleOptions?: boolean;
 }) {
   const [filter, setFilter] = useState<AutoTagFilter>(DEFAULT_AUTOTAG_FILTER);
 
@@ -38,7 +40,12 @@ export default function AutoTagModal({
 
         <div className="border-t border-zinc-200 dark:border-zinc-700" />
 
-        <AutoTagOptions value={filter} onChange={setFilter} showSkipOptions={showSkipOptions} />
+        <AutoTagOptions
+          value={filter}
+          onChange={setFilter}
+          showSkipOptions={showSkipOptions}
+          showAngleOptions={showAngleOptions}
+        />
 
         <div className="border-t border-zinc-200 dark:border-zinc-700" />
 

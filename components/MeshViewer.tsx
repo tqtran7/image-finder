@@ -39,7 +39,7 @@ export default function MeshViewer({
     let raf = 0;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setClearColor(0x000000, 0);
+    renderer.setClearColor(0x3f3f46, 1); // zinc-700 — matches thumbnail background
     renderer.domElement.style.width = "100%";
     renderer.domElement.style.height = "100%";
     renderer.domElement.style.display = "block";

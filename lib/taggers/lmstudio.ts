@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
-import { DEFAULT_TAG_PROMPT } from "@/lib/taggers/prompts";
+import { DEFAULT_TAG_PROMPT, parseTags } from "@/lib/taggers/prompts";
+import type { TagImage } from "@/lib/taggers";
 
 const BASE_URL = (process.env.LMSTUDIO_BASE_URL ?? "http://127.0.0.1:1234").replace(/\/$/, "");
 const MODEL = process.env.LMSTUDIO_MODEL ?? "local-model";
@@ -11,7 +12,6 @@ interface OpenAIChatResponse {
 
 export class LMStudioTagger {
   async tag(absPath: string, ext: string, prompt?: string, invert = false, addBlackBackground = false): Promise<string[]> {
-    const effectivePrompt = prompt?.trim() || DEFAULT_TAG_PROMPT;
     let imageBytes: Buffer;
 
     if (ext === "svg") {
@@ -40,7 +40,11 @@ export class LMStudioTagger {
       mimeType = "image/png";
     }
 
-    const imageBase64 = imageBytes.toString("base64");
+    return this.tagImageBytes([{ bytes: imageBytes, mediaType: mimeType }], prompt);
+  }
+
+  async tagImageBytes(images: TagImage[], prompt?: string): Promise<string[]> {
+    const effectivePrompt = prompt?.trim() || DEFAULT_TAG_PROMPT;
 
     let response: Response;
     try {
@@ -54,7 +58,10 @@ export class LMStudioTagger {
               role: "user",
               content: [
                 { type: "text", text: effectivePrompt },
-                { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+                ...images.map((img) => ({
+                  type: "image_url",
+                  image_url: { url: `data:${img.mediaType};base64,${img.bytes.toString("base64")}` },
+                })),
               ],
             },
           ],
@@ -84,23 +91,6 @@ export class LMStudioTagger {
       );
     }
 
-    const text = choice?.message?.content ?? "";
-
-    try {
-      const match = text.match(/\[[\s\S]*\]/);
-      if (!match) return [];
-      const parsed = JSON.parse(match[0]);
-      if (!Array.isArray(parsed)) return [];
-      return [
-        ...new Set(
-          parsed
-            .filter((t): t is string => typeof t === "string")
-            .map((t) => t.toLowerCase().trim())
-            .filter(Boolean),
-        ),
-      ];
-    } catch {
-      return [];
-    }
+    return parseTags(choice?.message?.content ?? "");
   }
 }

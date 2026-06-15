@@ -10,6 +10,7 @@ import {
   moveRootToCollection,
 } from "@/lib/actions";
 import { useAutoTagBatch } from "@/components/useAutoTagBatch";
+import { tagAndAcceptMeshItem } from "@/lib/three/tagMesh";
 import AutoTagModal from "@/components/AutoTagModal";
 import MoveRootModal from "@/components/MoveRootModal";
 import CollectionPromptPreview from "@/components/CollectionPromptPreview";
@@ -41,9 +42,9 @@ export default function FolderDetails({
   const [copied, setCopied] = useState(false);
 
   const isTagging = status !== "idle";
-  const noun = kind === "mesh" ? "meshes" : "images";
-  // AI vision tagging can't read raw 3D files, so it's hidden for meshes (v1).
-  const showAutoTag = kind !== "mesh";
+  const isMesh = kind === "mesh";
+  const noun = isMesh ? "meshes" : "images";
+  const showAutoTag = true;
 
   function handleCopyPath() {
     navigator.clipboard.writeText(root.path);
@@ -63,7 +64,11 @@ export default function FolderDetails({
   }
 
   function handleConfirm(filter: AutoTagFilter) {
-    start((f) => getImagesForRoot(root.id, f), filter);
+    start(
+      (f) => getImagesForRoot(root.id, f),
+      filter,
+      isMesh ? tagAndAcceptMeshItem : undefined,
+    );
   }
 
   function doClearTags() {
@@ -277,7 +282,7 @@ export default function FolderDetails({
       {confirmAction === "remove" && (
         <div className="rounded-lg border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-900/10 p-3">
           <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-3 leading-relaxed">
-            Remove this folder and its {root.image_count.toLocaleString()} images from the
+            Remove this folder and its {root.image_count.toLocaleString()} {noun} from the
             collection? Files on disk will not be deleted.
           </p>
           <div className="flex gap-2">
@@ -301,9 +306,10 @@ export default function FolderDetails({
       {showModal && (
         <AutoTagModal
           title={`Auto-tag "${root.label}"`}
-          description={`${root.image_count.toLocaleString()} images — tags applied automatically without review.`}
+          description={`${root.image_count.toLocaleString()} ${noun} — tags applied automatically without review.`}
           onConfirm={handleConfirm}
           onClose={() => setShowModal(false)}
+          showAngleOptions={isMesh}
         />
       )}
 

@@ -1,6 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { readFileSync } from "node:fs";
-import { DEFAULT_TAG_PROMPT } from "@/lib/taggers/prompts";
+import { DEFAULT_TAG_PROMPT, parseTags } from "@/lib/taggers/prompts";
+import type { TagImage } from "@/lib/taggers";
+
+type ClaudeMediaType = "image/png" | "image/jpeg" | "image/gif" | "image/webp";
 
 const MODEL = process.env.TAGGER_MODEL ?? "claude-haiku-4-5";
 
@@ -16,9 +19,8 @@ export class ClaudeTagger {
   private client = new Anthropic();
 
   async tag(absPath: string, ext: string, prompt?: string, invert = false, addBlackBackground = false): Promise<string[]> {
-    const effectivePrompt = prompt?.trim() || DEFAULT_TAG_PROMPT;
     let imageBytes: Buffer;
-    let mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+    let mediaType: ClaudeMediaType;
 
     if (ext === "svg") {
       // Rasterize SVG → PNG before sending to Claude (vision API doesn't accept SVG)
@@ -48,7 +50,11 @@ export class ClaudeTagger {
       mediaType = "image/png";
     }
 
-    const imageBase64 = imageBytes.toString("base64");
+    return this.tagImageBytes([{ bytes: imageBytes, mediaType }], prompt);
+  }
+
+  async tagImageBytes(images: TagImage[], prompt?: string): Promise<string[]> {
+    const effectivePrompt = prompt?.trim() || DEFAULT_TAG_PROMPT;
 
     const response = await this.client.messages.create({
       model: MODEL,
@@ -57,11 +63,15 @@ export class ClaudeTagger {
         {
           role: "user",
           content: [
-            {
-              type: "image",
-              source: { type: "base64", media_type: mediaType, data: imageBase64 },
-            },
-            { type: "text", text: effectivePrompt },
+            ...images.map((img) => ({
+              type: "image" as const,
+              source: {
+                type: "base64" as const,
+                media_type: img.mediaType as ClaudeMediaType,
+                data: img.bytes.toString("base64"),
+              },
+            })),
+            { type: "text" as const, text: effectivePrompt },
           ],
         },
       ],
@@ -69,22 +79,6 @@ export class ClaudeTagger {
 
     const textBlock = response.content.find((b) => b.type === "text");
     if (!textBlock || textBlock.type !== "text") return [];
-
-    try {
-      const match = textBlock.text.match(/\[[\s\S]*\]/);
-      if (!match) return [];
-      const parsed = JSON.parse(match[0]);
-      if (!Array.isArray(parsed)) return [];
-      return [
-        ...new Set(
-          parsed
-            .filter((t): t is string => typeof t === "string")
-            .map((t) => t.toLowerCase().trim())
-            .filter(Boolean),
-        ),
-      ];
-    } catch {
-      return [];
-    }
+    return parseTags(textBlock.text);
   }
 }
