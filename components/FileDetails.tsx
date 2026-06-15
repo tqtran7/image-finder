@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import TagEditor from "@/components/TagEditor";
 import AutoTagModal from "@/components/AutoTagModal";
+import MeshViewer from "@/components/MeshViewer";
 import { removeTag, autoTagImages, clearGeneratedTags } from "@/lib/actions";
 import type { AutoTagFilter } from "@/lib/actions";
 import type { ImageItem } from "@/components/IconCard";
@@ -92,6 +93,18 @@ export default function FileDetails({
           </button>
         </div>
       </div>
+      )}
+
+      {/* Interactive 3D preview — only for a single selected mesh */}
+      {kind === "mesh" && count === 1 && selectedList[0].ext.toLowerCase() === "fbx" && (
+        <div className="mb-3 aspect-square w-full overflow-hidden rounded-lg bg-zinc-200 dark:bg-zinc-700">
+          <MeshViewer
+            key={selectedList[0].id}
+            url={`/api/file?id=${selectedList[0].id}`}
+            interactive
+            autoRotate
+          />
+        </div>
       )}
 
       {/* File name + path — only when exactly one image is selected */}
