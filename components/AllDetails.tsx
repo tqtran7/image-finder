@@ -14,17 +14,22 @@ export default function AllDetails({
   totalCount,
   activeCollection,
   onEditCollection,
+  kind = "image",
 }: {
   collectionId: number;
   collectionName: string;
   totalCount: number;
   activeCollection: CollectionItem | null;
   onEditCollection: (collection: CollectionItem) => void;
+  kind?: "image" | "mesh";
 }) {
   const [showModal, setShowModal] = useState(false);
   const { status, progress, summary, start, pause, resume, stop } = useAutoTagBatch();
 
   const isActive = status !== "idle";
+  const noun = kind === "mesh" ? "meshes" : "images";
+  // AI vision tagging can't read raw 3D files, so it's hidden for meshes (v1).
+  const showAutoTag = kind !== "mesh";
 
   function handleConfirm(filter: AutoTagFilter) {
     start((f) => getImagesForCollection(collectionId, f), filter);
@@ -46,21 +51,23 @@ export default function AllDetails({
         </p>
       </div>
 
-      {/* Image count */}
+      {/* File count */}
       <div>
         <p className="text-xs text-zinc-400 dark:text-zinc-500">
-          {totalCount.toLocaleString()} images
+          {totalCount.toLocaleString()} {noun}
         </p>
       </div>
 
-      {/* Active collection's custom prompt preview — click to edit */}
-      <CollectionPromptPreview
-        collection={activeCollection}
-        onEdit={onEditCollection}
-      />
+      {/* Active collection's custom prompt preview — click to edit (AI-tagging only) */}
+      {showAutoTag && (
+        <CollectionPromptPreview
+          collection={activeCollection}
+          onEdit={onEditCollection}
+        />
+      )}
 
       {/* Auto-tag progress */}
-      {progress && (
+      {showAutoTag && progress && (
         <div>
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-violet-600 dark:text-violet-400 font-medium">
@@ -81,13 +88,14 @@ export default function AllDetails({
           )}
         </div>
       )}
-      {summary && (
+      {showAutoTag && summary && (
         <p className="text-xs text-zinc-500 dark:text-zinc-400">{summary}</p>
       )}
 
-      <div className="border-t border-zinc-200 dark:border-zinc-700" />
+      {showAutoTag && <div className="border-t border-zinc-200 dark:border-zinc-700" />}
 
       {/* Actions */}
+      {showAutoTag && (
       <div className="flex flex-col gap-0.5">
         {!isActive && (
           <button
@@ -130,6 +138,7 @@ export default function AllDetails({
           </button>
         )}
       </div>
+      )}
 
       {showModal && (
         <AutoTagModal

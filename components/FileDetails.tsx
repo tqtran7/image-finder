@@ -12,6 +12,7 @@ interface FileDetailsProps {
   images: ImageItem[];
   vocabulary: string[];
   onTagClick: (tagName: string) => void;
+  kind?: "image" | "mesh";
 }
 
 export default function FileDetails({
@@ -19,7 +20,10 @@ export default function FileDetails({
   images,
   vocabulary,
   onTagClick,
+  kind = "image",
 }: FileDetailsProps) {
+  // AI vision tagging can't read raw 3D files, so it's hidden for meshes (v1).
+  const showAutoTag = kind !== "mesh";
   const [isPending, startTransition] = useTransition();
   const [isAutoTagging, startAutoTag] = useTransition();
   const [isClearing, startClear] = useTransition();
@@ -59,6 +63,7 @@ export default function FileDetails({
   return (
     <div className="border-b border-zinc-200 dark:border-zinc-700 px-4 py-4">
       {/* Header row */}
+      {showAutoTag && (
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <button
@@ -87,6 +92,7 @@ export default function FileDetails({
           </button>
         </div>
       </div>
+      )}
 
       {/* File name + path — only when exactly one image is selected */}
       {count === 1 && (

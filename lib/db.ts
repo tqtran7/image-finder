@@ -105,6 +105,22 @@ function migrate(db: DB): void {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_suggestions_unique ON tag_suggestions(image_id, name);
   `);
 
+  // ── collections.kind (added incrementally) ────────────────────────────────
+  // Distinguishes image collections from mesh collections so the /images and
+  // /meshes sections query disjoint sets. A root/file's kind derives from its
+  // collection, so kind only needs to live here.
+  const collectionKindCols = db.prepare("PRAGMA table_info(collections)").all() as {
+    name: string;
+  }[];
+  if (!collectionKindCols.some((c) => c.name === "kind")) {
+    db.exec(
+      "ALTER TABLE collections ADD COLUMN kind TEXT NOT NULL DEFAULT 'image'",
+    );
+  }
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_collections_kind ON collections(kind)",
+  );
+
   // ── roots.collection_id (added incrementally on existing DBs) ──────────────
   const rootCols = db.prepare("PRAGMA table_info(roots)").all() as {
     name: string;
@@ -191,12 +207,31 @@ function migrate(db: DB): void {
   }
   const defaultId = (
     db
-      .prepare("SELECT id FROM collections ORDER BY id ASC LIMIT 1")
-      .get() as { id: number }
+      .prepare("SELECT id FROM collections WHERE kind = 'image' ORDER BY id ASC LIMIT 1")
+      .get() as { id: number } | undefined
+  )?.id ?? (
+    db.prepare("SELECT id FROM collections ORDER BY id ASC LIMIT 1").get() as { id: number }
   ).id;
   db.prepare(
     "UPDATE roots SET collection_id = ? WHERE collection_id IS NULL",
   ).run(defaultId);
+
+  // ── Ensure a default "Meshes" collection exists for the /meshes section ─────
+  const meshCount = (
+    db
+      .prepare("SELECT COUNT(*) AS n FROM collections WHERE kind = 'mesh'")
+      .get() as { n: number }
+  ).n;
+  if (meshCount === 0) {
+    const nextOrder = (
+      db
+        .prepare("SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM collections")
+        .get() as { n: number }
+    ).n;
+    db.prepare(
+      "INSERT INTO collections (name, prompt, created_at, sort_order, kind) VALUES ('Meshes', NULL, ?, ?, 'mesh')",
+    ).run(Date.now(), nextOrder);
+  }
 }
 
 export function getDb(): DB {

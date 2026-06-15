@@ -9,7 +9,10 @@ import { getTagger, getTaggerModel } from "@/lib/taggers";
 
 // ── Collections ────────────────────────────────────────────────────────────
 
-export async function createCollection(name: string): Promise<number> {
+export async function createCollection(
+  name: string,
+  kind: "image" | "mesh" = "image",
+): Promise<number> {
   const db = getDb();
   const nextOrder = (
     db
@@ -18,10 +21,10 @@ export async function createCollection(name: string): Promise<number> {
   ).n;
   const result = db
     .prepare(
-      "INSERT INTO collections (name, prompt, created_at, sort_order) VALUES (?, NULL, ?, ?) RETURNING id",
+      "INSERT INTO collections (name, prompt, created_at, sort_order, kind) VALUES (?, NULL, ?, ?, ?) RETURNING id",
     )
-    .get(name.trim(), Date.now(), nextOrder) as { id: number };
-  revalidatePath("/");
+    .get(name.trim(), Date.now(), nextOrder, kind) as { id: number };
+  revalidatePath("/", "layout");
   return result.id;
 }
 
@@ -29,18 +32,18 @@ export async function reorderCollections(orderedIds: number[]) {
   const db = getDb();
   const upd = db.prepare("UPDATE collections SET sort_order = ? WHERE id = ?");
   db.transaction(() => orderedIds.forEach((id, i) => upd.run(i, id)))();
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 export async function renameCollection(id: number, name: string) {
   getDb().prepare("UPDATE collections SET name = ? WHERE id = ?").run(name.trim(), id);
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 export async function updateCollectionPrompt(id: number, prompt: string) {
   const trimmed = prompt.trim() || null;
   getDb().prepare("UPDATE collections SET prompt = ? WHERE id = ?").run(trimmed, id);
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 export async function deleteCollection(id: number) {
@@ -60,7 +63,7 @@ export async function deleteCollection(id: number) {
     db.prepare("UPDATE roots SET collection_id = ? WHERE collection_id = ?").run(defaultId, id);
     db.prepare("DELETE FROM collections WHERE id = ?").run(id);
   })();
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 // ── Roots ──────────────────────────────────────────────────────────────────
@@ -102,17 +105,17 @@ export async function addRoot(absPath: string, collectionId: number, label?: str
 
   if (result?.id) scanRoot(result.id);
 
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 export async function rescanRoot(rootId: number) {
   scanRoot(rootId);
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 export async function removeRoot(id: number) {
   getDb().prepare("DELETE FROM roots WHERE id = ?").run(id);
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 export async function moveRootToCollection(rootId: number, targetCollectionId: number) {
@@ -127,7 +130,7 @@ export async function moveRootToCollection(rootId: number, targetCollectionId: n
   db.prepare(
     "UPDATE roots SET collection_id = ?, sort_order = ? WHERE id = ?",
   ).run(targetCollectionId, nextOrder, rootId);
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 export async function reorderRoots(collectionId: number, orderedIds: number[]) {
@@ -136,7 +139,7 @@ export async function reorderRoots(collectionId: number, orderedIds: number[]) {
     "UPDATE roots SET sort_order = ? WHERE id = ? AND collection_id = ?",
   );
   db.transaction(() => orderedIds.forEach((id, i) => upd.run(i, id, collectionId)))();
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 // ── Tags ───────────────────────────────────────────────────────────────────
@@ -169,7 +172,7 @@ export async function addTags(imageIds: number[], tagNames: string[]) {
     }
   })();
 
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 export async function clearTagsForRoot(rootId: number) {
@@ -184,7 +187,7 @@ export async function clearTagsForRoot(rootId: number) {
       `UPDATE images SET tagged_at = NULL, tagger_model = NULL WHERE root_id = ?`,
     ).run(rootId);
   })();
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 export async function clearGeneratedTags(imageIds: number[]) {
@@ -199,7 +202,7 @@ export async function clearGeneratedTags(imageIds: number[]) {
       `UPDATE images SET tagged_at = NULL, tagger_model = NULL WHERE id IN (${placeholders})`,
     ).run(...imageIds);
   })();
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 export async function removeTag(imageId: number, tagName: string) {
@@ -220,7 +223,7 @@ export async function removeTag(imageId: number, tagName: string) {
          )`,
     ).run(imageId, imageId);
   })();
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 // ── AI auto-tagging ────────────────────────────────────────────────────────
@@ -272,7 +275,7 @@ export async function autoTagImages(imageIds: number[], invert = false, addBlack
   }
 
   console.log(`[autoTag] done: ${tagged}/${images.length} images tagged, ${errors.length} errors`);
-  revalidatePath("/");
+  revalidatePath("/", "layout");
   return { tagged, total: images.length, errors };
 }
 
@@ -452,12 +455,12 @@ export async function acceptSuggestions(imageId: number) {
     }
   })();
 
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 export async function rejectSuggestions(imageId: number) {
   getDb()
     .prepare("UPDATE tag_suggestions SET status = 'rejected' WHERE image_id = ? AND status = 'pending'")
     .run(imageId);
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }

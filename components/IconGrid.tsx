@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import IconCard, { CARD_W, CARD_H, type ImageItem } from "@/components/IconCard";
+import MeshCard from "@/components/MeshCard";
 
 const GAP = 8;
 
@@ -12,6 +13,7 @@ interface IconGridProps {
   onCardClick: (id: number) => void;
   onRemoveTag: (imageId: number, tagName: string) => void;
   onTagClick: (tagName: string) => void;
+  kind?: "image" | "mesh";
 }
 
 export default function IconGrid({
@@ -20,7 +22,10 @@ export default function IconGrid({
   onCardClick,
   onRemoveTag,
   onTagClick,
+  kind = "image",
 }: IconGridProps) {
+  const Card = kind === "mesh" ? MeshCard : IconCard;
+  const noun = kind === "mesh" ? "meshes" : "images";
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
 
@@ -53,12 +58,12 @@ export default function IconGrid({
     >
       {images.length === 0 ? (
         <p className="text-sm text-zinc-400 dark:text-zinc-500 text-center py-16">
-          No images found. Add a folder to get started.
+          No {noun} found. Add a folder to get started.
         </p>
       ) : (
         <>
           <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-3">
-            {images.length.toLocaleString()} images
+            {images.length.toLocaleString()} {noun}
           </p>
           <div
             style={{
@@ -86,7 +91,7 @@ export default function IconGrid({
                   }}
                 >
                   {rowImages.map((img) => (
-                    <IconCard
+                    <Card
                       key={img.id}
                       image={img}
                       selected={selectedIds.has(img.id)}

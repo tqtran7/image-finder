@@ -23,6 +23,7 @@ interface DetailsPanelProps {
   collections: CollectionItem[];
   onEditCollection: (collection: CollectionItem) => void;
   width?: number;
+  kind?: "image" | "mesh";
 }
 
 export default function DetailsPanel({
@@ -39,6 +40,7 @@ export default function DetailsPanel({
   collections,
   onEditCollection,
   width,
+  kind = "image",
 }: DetailsPanelProps) {
   const hasSelection = selectedIds.size > 0;
   const hasFolder = activeRoot !== null;
@@ -59,6 +61,7 @@ export default function DetailsPanel({
           totalCount={totalCount}
           activeCollection={activeCollection}
           onEditCollection={onEditCollection}
+          kind={kind}
         />
       )}
       {hasFolder && (
@@ -67,6 +70,7 @@ export default function DetailsPanel({
           activeCollection={activeCollection}
           collections={collections}
           onEditCollection={onEditCollection}
+          kind={kind}
         />
       )}
       {hasSelection && (
@@ -75,6 +79,7 @@ export default function DetailsPanel({
           images={images}
           vocabulary={vocabulary}
           onTagClick={onTagClick}
+          kind={kind}
         />
       )}
       {hasSuggestions && <TagSuggestions groups={suggestions} />}

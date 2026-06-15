@@ -14,12 +14,14 @@ interface CollectionSwitcherProps {
   collections: CollectionItem[];
   activeCollectionId: number;
   onEditCollection: (collection: CollectionItem) => void;
+  kind?: "image" | "mesh";
 }
 
 export default function CollectionSwitcher({
   collections,
   activeCollectionId,
   onEditCollection,
+  kind = "image",
 }: CollectionSwitcherProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -69,7 +71,7 @@ export default function CollectionSwitcher({
     const name = newName.trim();
     if (!name) return;
     startCreate(async () => {
-      const id = await createCollection(name);
+      const id = await createCollection(name, kind);
       setCreating(false);
       setNewName("");
       // Switch to the new collection

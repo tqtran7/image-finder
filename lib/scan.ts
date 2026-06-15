@@ -7,6 +7,13 @@ const IMAGE_EXTS = new Set([
   "svg", "png", "jpg", "jpeg", "gif", "webp", "ico", "bmp", "avif",
 ]);
 
+const MESH_EXTS = new Set(["fbx"]);
+
+const EXTS_BY_KIND: Record<string, Set<string>> = {
+  image: IMAGE_EXTS,
+  mesh: MESH_EXTS,
+};
+
 interface FileStat {
   size: number;
   mtime: number;
@@ -26,14 +33,22 @@ export function scanRoot(rootId: number): ScanResult {
   const db = getDb();
 
   const root = db
-    .prepare("SELECT id, path FROM roots WHERE id = ?")
-    .get(rootId) as { id: number; path: string } | undefined;
+    .prepare(
+      `SELECT r.id, r.path, c.kind
+       FROM roots r
+       LEFT JOIN collections c ON c.id = r.collection_id
+       WHERE r.id = ?`,
+    )
+    .get(rootId) as { id: number; path: string; kind: string | null } | undefined;
 
   if (!root) throw new Error(`Root ${rootId} not found`);
 
-  // Walk the directory and collect all image file paths + stats
+  // The file extensions to index depend on the collection's kind (image vs mesh)
+  const exts = EXTS_BY_KIND[root.kind ?? "image"] ?? IMAGE_EXTS;
+
+  // Walk the directory and collect all matching file paths + stats
   const found = new Map<string, FileStat>();
-  walkDir(root.path, found);
+  walkDir(root.path, found, exts);
 
   const now = Date.now();
 
@@ -138,7 +153,7 @@ export function scanRoot(rootId: number): ScanResult {
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-function walkDir(dir: string, out: Map<string, FileStat>): void {
+function walkDir(dir: string, out: Map<string, FileStat>, exts: Set<string>): void {
   let names: string[];
   try {
     names = readdirSync(dir) as string[];
@@ -156,10 +171,10 @@ function walkDir(dir: string, out: Map<string, FileStat>): void {
     }
 
     if (st.isDirectory()) {
-      walkDir(full, out);
+      walkDir(full, out, exts);
     } else if (st.isFile()) {
       const ext = path.extname(name).slice(1).toLowerCase();
-      if (IMAGE_EXTS.has(ext)) {
+      if (exts.has(ext)) {
         out.set(full, { size: st.size, mtime: Math.floor(st.mtimeMs) });
       }
     }

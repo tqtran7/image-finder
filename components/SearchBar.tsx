@@ -7,12 +7,14 @@ interface SearchBarProps {
   vocabulary: string[];
   totalCount: number;
   filteredCount: number;
+  basePath?: string;
 }
 
 export default function SearchBar({
   vocabulary,
   totalCount,
   filteredCount,
+  basePath = "/images",
 }: SearchBarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -59,7 +61,7 @@ export default function SearchBar({
     const p = new URLSearchParams(searchParams.toString());
     p.delete("tags");
     const qs = p.toString();
-    router.replace(qs ? "?" + qs : "/", { scroll: false });
+    router.replace(qs ? "?" + qs : basePath, { scroll: false });
     setInput("");
   }
 

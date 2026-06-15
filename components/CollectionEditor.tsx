@@ -10,9 +10,10 @@ interface CollectionEditorProps {
   collection: CollectionItem;
   isDefault: boolean;
   onClose: () => void;
+  basePath?: string;
 }
 
-export default function CollectionEditor({ collection, isDefault, onClose }: CollectionEditorProps) {
+export default function CollectionEditor({ collection, isDefault, onClose, basePath = "/images" }: CollectionEditorProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -48,7 +49,7 @@ export default function CollectionEditor({ collection, isDefault, onClose }: Col
         if (p.get("collection") === String(collection.id)) {
           p.delete("collection");
           p.delete("tags");
-          router.replace(p.toString() ? "?" + p.toString() : "/", { scroll: false });
+          router.replace(p.toString() ? "?" + p.toString() : basePath, { scroll: false });
         }
         onClose();
       } catch (e) {

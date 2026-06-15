@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useTransition, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import FolderListPanel from "@/components/FolderListPanel";
 import DetailsPanel from "@/components/DetailsPanel";
 import IconGrid from "@/components/IconGrid";
@@ -67,6 +68,8 @@ interface PageContentProps {
   suggestions: FileDetailGroup[];
   collections: CollectionItem[];
   activeCollectionId: number;
+  kind: "image" | "mesh";
+  basePath: string;
 }
 
 export default function PageContent({
@@ -78,6 +81,8 @@ export default function PageContent({
   suggestions,
   collections,
   activeCollectionId,
+  kind,
+  basePath,
 }: PageContentProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -139,9 +144,29 @@ export default function PageContent({
     <div className="h-screen flex flex-col font-sans bg-zinc-50 dark:bg-zinc-900">
       {/* Header */}
       <header className="shrink-0 bg-white dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700 px-6 py-3 flex items-center justify-between">
-        <h1 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-          Icon Finder
-        </h1>
+        <div className="flex items-center gap-5">
+          <h1 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+            {kind === "mesh" ? "Mesh Finder" : "Icon Finder"}
+          </h1>
+          <nav className="flex items-center gap-1 text-xs">
+            {([
+              { href: "/images", label: "Images", active: kind === "image" },
+              { href: "/meshes", label: "Meshes", active: kind === "mesh" },
+            ] as const).map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
+                  item.active
+                    ? "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
+                    : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
         <ThemeToggle />
       </header>
 
@@ -158,6 +183,7 @@ export default function PageContent({
               collections={collections}
               activeCollectionId={activeCollectionId}
               onEditCollection={setEditingCollection}
+              kind={kind}
             />
           </Suspense>
 
@@ -186,6 +212,7 @@ export default function PageContent({
             collection={editingCollection}
             isDefault={editingCollection.id === collections[0]?.id}
             onClose={() => setEditingCollection(null)}
+            basePath={basePath}
           />
         )}
 
@@ -196,6 +223,7 @@ export default function PageContent({
               vocabulary={vocabulary}
               totalCount={totalCount}
               filteredCount={images.length}
+              basePath={basePath}
             />
           </Suspense>
           <IconGrid
@@ -204,6 +232,7 @@ export default function PageContent({
             onCardClick={handleCardClick}
             onRemoveTag={handleRemoveTag}
             onTagClick={handleTagClick}
+            kind={kind}
           />
         </main>
 
@@ -228,6 +257,7 @@ export default function PageContent({
           collections={collections}
           onEditCollection={setEditingCollection}
           width={right.width}
+          kind={kind}
         />
       </div>
     </div>

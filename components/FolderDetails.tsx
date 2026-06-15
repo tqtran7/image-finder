@@ -22,11 +22,13 @@ export default function FolderDetails({
   activeCollection,
   collections,
   onEditCollection,
+  kind = "image",
 }: {
   root: RootWithCount;
   activeCollection: CollectionItem | null;
   collections: CollectionItem[];
   onEditCollection: (collection: CollectionItem) => void;
+  kind?: "image" | "mesh";
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -39,6 +41,9 @@ export default function FolderDetails({
   const [copied, setCopied] = useState(false);
 
   const isTagging = status !== "idle";
+  const noun = kind === "mesh" ? "meshes" : "images";
+  // AI vision tagging can't read raw 3D files, so it's hidden for meshes (v1).
+  const showAutoTag = kind !== "mesh";
 
   function handleCopyPath() {
     navigator.clipboard.writeText(root.path);
@@ -118,12 +123,12 @@ export default function FolderDetails({
           </button>
         </div>
         <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">
-          {root.image_count.toLocaleString()} images
+          {root.image_count.toLocaleString()} {noun}
         </p>
       </div>
 
-      {/* Active collection's custom prompt preview — click to edit */}
-      {activeCollection?.prompt && (
+      {/* Active collection's custom prompt preview — click to edit (AI-tagging only) */}
+      {showAutoTag && activeCollection?.prompt && (
         <CollectionPromptPreview
           collection={activeCollection}
           onEdit={onEditCollection}
@@ -131,7 +136,7 @@ export default function FolderDetails({
       )}
 
       {/* Auto-tag progress */}
-      {progress && (
+      {showAutoTag && progress && (
         <div>
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-violet-600 dark:text-violet-400 font-medium">
@@ -152,7 +157,7 @@ export default function FolderDetails({
           )}
         </div>
       )}
-      {summary && (
+      {showAutoTag && summary && (
         <p className="text-xs text-zinc-500 dark:text-zinc-400">{summary}</p>
       )}
 
@@ -160,7 +165,7 @@ export default function FolderDetails({
 
       {/* Actions */}
       <div className="flex flex-col gap-0.5">
-        {!isTagging && (
+        {showAutoTag && !isTagging && (
           <button
             onClick={() => setShowModal(true)}
             disabled={pending || root.image_count === 0}
@@ -173,7 +178,7 @@ export default function FolderDetails({
           </button>
         )}
 
-        {status === "running" && (
+        {showAutoTag && status === "running" && (
           <button
             onClick={pause}
             className="w-full text-left text-xs font-medium px-2 py-2 rounded-lg
@@ -182,7 +187,7 @@ export default function FolderDetails({
             ⏸ Pause
           </button>
         )}
-        {status === "paused" && (
+        {showAutoTag && status === "paused" && (
           <button
             onClick={resume}
             className="w-full text-left text-xs font-medium px-2 py-2 rounded-lg
@@ -191,7 +196,7 @@ export default function FolderDetails({
             ▶ Resume
           </button>
         )}
-        {isTagging && (
+        {showAutoTag && isTagging && (
           <button
             onClick={stop}
             className="w-full text-left text-xs font-medium px-2 py-2 rounded-lg
@@ -200,16 +205,18 @@ export default function FolderDetails({
             ■ Stop
           </button>
         )}
-        <button
-          onClick={() => setConfirmAction("clear")}
-          disabled={pending || isTagging}
-          className="w-full text-left text-xs font-medium px-2 py-2 rounded-lg
-                     text-zinc-600 hover:bg-zinc-100
-                     dark:text-zinc-300 dark:hover:bg-zinc-800
-                     disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          ✕ Clear auto-tags in folder
-        </button>
+        {showAutoTag && (
+          <button
+            onClick={() => setConfirmAction("clear")}
+            disabled={pending || isTagging}
+            className="w-full text-left text-xs font-medium px-2 py-2 rounded-lg
+                       text-zinc-600 hover:bg-zinc-100
+                       dark:text-zinc-300 dark:hover:bg-zinc-800
+                       disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            ✕ Clear auto-tags in folder
+          </button>
+        )}
         <button
           onClick={handleRescan}
           disabled={pending || isTagging}
